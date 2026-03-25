@@ -63,7 +63,9 @@ function renderCenter() {
           MOBORR.IO
         </div>
         <div class="text-purple-300 text-sm tracking-widest mb-6">BROWSER FPS • ALPHA</div>
-        <div class="mb-6 text-[6rem]" title="Your hero character">🤖</div>
+        <div class="mb-6" title="Your hero character">
+  <img src="./assets/logo.png" class="w-48 h-48 object-contain drop-shadow-lg" alt="Moborr Logo"/>
+</div>
         <button id="playBtn" class="bg-yellow-400 hover:bg-yellow-300 active:bg-yellow-500 text-black font-black rounded-full px-12 py-4 text-2xl shadow-lg transition transform hover:scale-105 mb-6">
           ► PLAY NOW
         </button>
