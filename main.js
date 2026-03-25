@@ -14,13 +14,12 @@ let currentModal = null;
 function renderSidebar() {
   return `
     <nav class="sidebar flex flex-col gap-4 bg-black bg-opacity-60 text-white w-44 p-4 min-h-screen shadow-xl border-r border-purple-500 border-opacity-30">
-      <div class="flex items-center mb-6 pb-4 border-b border-purple-400 border-opacity-30">
-        <div class="text-3xl mr-3">${mockUser.avatar}</div>
-        <div>
-          <div class="font-bold text-sm">${mockUser.nickname}</div>
-          <div class="text-xs text-yellow-400">Lv. ${mockUser.level}</div>
-        </div>
-      </div>
+      <button class="nav-item-btn flex items-center mb-6 pb-4 border-b border-purple-400 border-opacity-30 w-full hover:bg-purple-600 hover:bg-opacity-50 rounded p-2 transition" data-modal="profile">
+  <div class="text-3xl mr-3">${mockUser.avatar}</div>
+  <div>
+    <div class="font-bold text-sm">${mockUser.nickname}</div>
+  </div>
+</button>
       <button class="nav-item-btn active py-2 px-3 rounded flex items-center gap-2 hover:bg-purple-600 hover:bg-opacity-50 transition" data-modal="hub">
         🏠 <span>Hub</span>
       </button>
@@ -128,6 +127,7 @@ function getModalContent(modalName) {
   const modalTitles = {
     hub: "HUB",
     store: "STORE",
+    profile: "PROFILE",
     servers: "SERVERS",
     quests: "QUESTS",
     friends: "FRIENDS",
