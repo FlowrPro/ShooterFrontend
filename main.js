@@ -9,7 +9,7 @@ const mockUser = {
   avatar: "😎"
 };
 
-function renderSidebar(): string {
+function renderSidebar() {
   return `
     <nav class="sidebar flex flex-col gap-4 bg-black bg-opacity-60 text-white w-44 p-4 min-h-screen shadow-xl border-r border-purple-500 border-opacity-30">
       <div class="flex items-center mb-6 pb-4 border-b border-purple-400 border-opacity-30">
@@ -49,7 +49,7 @@ function renderSidebar(): string {
   `;
 }
 
-function renderCenter(): string {
+function renderCenter() {
   return `
     <main class="flex-1 flex flex-col items-center justify-center relative overflow-hidden">
       <div class="absolute inset-0 opacity-10 pointer-events-none">
@@ -78,7 +78,7 @@ function renderCenter(): string {
   `;
 }
 
-function renderRightPanel(): string {
+function renderRightPanel() {
   return `
     <aside class="flex flex-col gap-6 bg-black bg-opacity-60 w-72 p-5 text-white min-h-screen shadow-xl border-l border-purple-500 border-opacity-30 overflow-y-auto">
       <div>
@@ -149,7 +149,7 @@ function setupEventListeners() {
 function renderApp() {
   const app = document.getElementById("app");
   if (app) {
-    app.innerHTML = `${renderSidebar()}${renderCenter()}${renderRightPanel()}`;
+    app.innerHTML = renderSidebar() + renderCenter() + renderRightPanel();
     setupEventListeners();
   }
 }
@@ -159,5 +159,3 @@ if (document.readyState === "loading") {
 } else {
   renderApp();
 }
-
-export {};
