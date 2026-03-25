@@ -9,6 +9,8 @@ const mockUser = {
   avatar: "😎"
 };
 
+let currentModal = null;
+
 function renderSidebar() {
   return `
     <nav class="sidebar flex flex-col gap-4 bg-black bg-opacity-60 text-white w-44 p-4 min-h-screen shadow-xl border-r border-purple-500 border-opacity-30">
@@ -19,29 +21,29 @@ function renderSidebar() {
           <div class="text-xs text-yellow-400">Lv. ${mockUser.level}</div>
         </div>
       </div>
-      <button class="nav-item active py-2 px-3 rounded flex items-center gap-2 hover:bg-purple-600 hover:bg-opacity-50 transition">
+      <button class="nav-item-btn active py-2 px-3 rounded flex items-center gap-2 hover:bg-purple-600 hover:bg-opacity-50 transition" data-modal="hub">
         🏠 <span>Hub</span>
       </button>
-      <button class="nav-item py-2 px-3 rounded flex items-center gap-2 hover:bg-purple-600 hover:bg-opacity-50 transition">
+      <button class="nav-item-btn py-2 px-3 rounded flex items-center gap-2 hover:bg-purple-600 hover:bg-opacity-50 transition" data-modal="store">
         🛒 <span>Store</span>
       </button>
-      <button class="nav-item py-2 px-3 rounded flex items-center gap-2 hover:bg-purple-600 hover:bg-opacity-50 transition">
+      <button class="nav-item-btn py-2 px-3 rounded flex items-center gap-2 hover:bg-purple-600 hover:bg-opacity-50 transition" data-modal="servers">
         🔫 <span>Servers</span>
       </button>
-      <button class="nav-item py-2 px-3 rounded flex items-center gap-2 hover:bg-purple-600 hover:bg-opacity-50 transition">
+      <button class="nav-item-btn py-2 px-3 rounded flex items-center gap-2 hover:bg-purple-600 hover:bg-opacity-50 transition" data-modal="quests">
         🎯 <span>Quests</span>
       </button>
-      <button class="nav-item py-2 px-3 rounded flex items-center gap-2 hover:bg-purple-600 hover:bg-opacity-50 transition">
+      <button class="nav-item-btn py-2 px-3 rounded flex items-center gap-2 hover:bg-purple-600 hover:bg-opacity-50 transition" data-modal="friends">
         👥 <span>Friends</span>
       </button>
-      <button class="nav-item py-2 px-3 rounded flex items-center gap-2 hover:bg-purple-600 hover:bg-opacity-50 transition">
+      <button class="nav-item-btn py-2 px-3 rounded flex items-center gap-2 hover:bg-purple-600 hover:bg-opacity-50 transition" data-modal="inventory">
         📦 <span>Inventory</span>
       </button>
-      <button class="nav-item py-2 px-3 rounded flex items-center gap-2 hover:bg-purple-600 hover:bg-opacity-50 transition">
+      <button class="nav-item-btn py-2 px-3 rounded flex items-center gap-2 hover:bg-purple-600 hover:bg-opacity-50 transition" data-modal="map">
         🗺️ <span>Map</span>
       </button>
       <div class="mt-auto pt-4 border-t border-purple-400 border-opacity-30">
-        <button class="nav-item py-2 px-3 rounded flex items-center gap-2 w-full hover:bg-red-600 hover:bg-opacity-50 transition">
+        <button class="nav-item-btn py-2 px-3 rounded flex items-center gap-2 w-full hover:bg-red-600 hover:bg-opacity-50 transition" data-modal="settings">
           ⚙️ <span>Settings</span>
         </button>
       </div>
@@ -66,8 +68,8 @@ function renderCenter() {
           ► PLAY NOW
         </button>
         <div class="flex justify-center gap-3 mb-6">
-          <button class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded font-bold transition">Leaderboards</button>
-          <button class="bg-gray-700 hover:bg-gray-600 text-white px-6 py-2 rounded font-bold transition">Settings</button>
+          <button class="center-btn bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded font-bold transition" data-modal="leaderboards">Leaderboards</button>
+          <button class="center-btn bg-gray-700 hover:bg-gray-600 text-white px-6 py-2 rounded font-bold transition" data-modal="settings">Settings</button>
         </div>
         <div class="text-center text-gray-300 text-xs">
           <p>v0.1 Alpha • Inspired by Krunker & Kirka</p>
@@ -85,33 +87,20 @@ function renderRightPanel() {
         <div class="flex justify-between items-center mb-3">
           <div>
             <div class="font-bold text-lg">📋 Daily Quests</div>
-            <div class="text-xs text-gray-400">⏱️ Expire in 12:45:31</div>
           </div>
-          <button class="bg-blue-600 hover:bg-blue-500 px-3 py-1 rounded font-bold text-xs transition">View</button>
         </div>
-        <div class="mb-4 p-3 bg-gray-800 bg-opacity-50 rounded">
-          <div class="text-sm font-semibold mb-1">🔫 Get 100 Kills</div>
-          <div class="bg-gray-900 rounded h-2 relative w-full mb-2 overflow-hidden">
-            <div class="bg-yellow-400 h-2 rounded" style="width: 30%;"></div>
-          </div>
-          <div class="text-xs text-gray-400">30/100 • +500 XP</div>
-        </div>
-        <div class="mb-4 p-3 bg-gray-800 bg-opacity-50 rounded">
-          <div class="text-sm font-semibold mb-1">⭐ Earn 5000 Score</div>
-          <div class="bg-gray-900 rounded h-2 relative w-full mb-2 overflow-hidden">
-            <div class="bg-green-400 h-2 rounded" style="width: 65%;"></div>
-          </div>
-          <div class="text-xs text-gray-400">3250/5000 • +750 XP</div>
+        <div class="mb-4 p-3 bg-gray-800 bg-opacity-50 rounded text-center">
+          <p class="text-sm text-gray-300">Daily Quests - Coming Soon</p>
         </div>
       </div>
       <div>
         <div class="font-bold mb-3 text-lg">🎮 Game Mode</div>
         <div class="flex gap-2">
-          <button class="flex-1 bg-purple-600 hover:bg-purple-500 py-2 rounded font-bold text-sm transition">Create</button>
-          <button class="flex-1 bg-blue-600 hover:bg-blue-500 py-2 rounded font-bold text-sm transition">Join</button>
+          <button class="flex-1 bg-purple-600 hover:bg-purple-500 py-2 rounded font-bold text-sm transition center-btn" data-modal="create-game">Create</button>
+          <button class="flex-1 bg-blue-600 hover:bg-blue-500 py-2 rounded font-bold text-sm transition center-btn" data-modal="join-game">Join</button>
         </div>
       </div>
-      <button id="quickMatchBtn" class="w-full bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-300 hover:to-yellow-400 py-3 rounded-lg text-lg font-black text-black shadow-lg transition transform hover:scale-105">
+      <button id="quickMatchBtn" class="w-full bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-300 hover:to-yellow-400 py-3 rounded-lg text-lg font-black text-black shadow-lg transition transform hover:scale-105 center-btn" data-modal="quick-match">
         🚀 QUICK MATCH
       </button>
       <div>
@@ -133,16 +122,100 @@ function renderRightPanel() {
   `;
 }
 
+function getModalContent(modalName) {
+  const modalTitles = {
+    hub: "HUB",
+    store: "STORE",
+    servers: "SERVERS",
+    quests: "QUESTS",
+    friends: "FRIENDS",
+    inventory: "INVENTORY",
+    map: "MAP",
+    settings: "SETTINGS",
+    leaderboards: "LEADERBOARDS",
+    "create-game": "CREATE GAME",
+    "join-game": "JOIN GAME",
+    "quick-match": "QUICK MATCH"
+  };
+
+  return `
+    <div class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50" id="modalOverlay">
+      <div class="bg-gradient-to-br from-gray-900 to-gray-800 rounded-lg shadow-2xl border-2 border-purple-500 w-96 p-6 relative">
+        <!-- Close Button -->
+        <button id="closeModal" class="absolute top-4 right-4 bg-red-600 hover:bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold text-lg">
+          ✕
+        </button>
+
+        <!-- Modal Title -->
+        <h2 class="text-center text-2xl font-black text-white mb-6 mt-2">
+          ${modalTitles[modalName] || modalName.toUpperCase()}
+        </h2>
+
+        <!-- Modal Content -->
+        <div class="text-white text-center">
+          <p class="text-gray-300 mb-6">Content for ${modalTitles[modalName] || modalName.toUpperCase()} coming soon...</p>
+        </div>
+
+        <!-- Footer Button -->
+        <div class="mt-6 flex justify-center">
+          <button id="closeModalBtn" class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded font-bold">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function openModal(modalName) {
+  // Remove existing modal if any
+  const existingModal = document.getElementById("modalOverlay");
+  if (existingModal) {
+    existingModal.remove();
+  }
+
+  // Create and insert new modal
+  const modalHTML = getModalContent(modalName);
+  document.body.insertAdjacentHTML("beforeend", modalHTML);
+
+  // Setup close button listeners
+  document.getElementById("closeModal").addEventListener("click", closeModal);
+  document.getElementById("closeModalBtn").addEventListener("click", closeModal);
+  document.getElementById("modalOverlay").addEventListener("click", (e) => {
+    if (e.target.id === "modalOverlay") {
+      closeModal();
+    }
+  });
+}
+
+function closeModal() {
+  const modal = document.getElementById("modalOverlay");
+  if (modal) {
+    modal.remove();
+  }
+}
+
 function setupEventListeners() {
+  // Sidebar nav items
+  document.querySelectorAll(".nav-item-btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      const modalName = e.currentTarget.getAttribute("data-modal");
+      openModal(modalName);
+    });
+  });
+
+  // Center buttons
+  document.querySelectorAll(".center-btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      const modalName = e.currentTarget.getAttribute("data-modal");
+      openModal(modalName);
+    });
+  });
+
+  // Play button
   const playBtn = document.getElementById("playBtn");
-  const quickMatchBtn = document.getElementById("quickMatchBtn");
-  
   playBtn?.addEventListener("click", () => {
     alert("🎮 Loading gameplay scene...\n(Main FPS game coming next!)");
-  });
-  
-  quickMatchBtn?.addEventListener("click", () => {
-    alert("⚡ Searching for a quick match...");
   });
 }
 
