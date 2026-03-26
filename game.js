@@ -671,6 +671,8 @@ class FPSGame {
 
 export async function startGame(token, region = 'north-america') {
   try {
+    console.log('Starting game with region:', region);
+
     // Wait for THREE.js to load if needed
     let attempts = 0;
     while (!window.THREE && attempts < 50) {
@@ -682,26 +684,37 @@ export async function startGame(token, region = 'north-america') {
       throw new Error('Three.js failed to load');
     }
 
-    // Cleanup any old match first
-    try {
-      await fetch(`${BACKEND_URL}/match/cleanup`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
-      });
-    } catch (error) {
-      console.log('Cleanup skipped (first game)');
-    }
+    console.log('THREE.js loaded');
 
-    // Create canvas
+    // Create canvas first
     const canvas = document.createElement('canvas');
     canvas.id = 'gameCanvas';
     document.body.innerHTML = '';
     document.body.style.margin = '0';
     document.body.style.overflow = 'hidden';
     document.body.appendChild(canvas);
+
+    console.log('Canvas created');
+
+    // Cleanup any old match first (without waiting too long)
+    try {
+      console.log('Attempting cleanup...');
+      const cleanupResponse = await Promise.race([
+        fetch(`${BACKEND_URL}/match/cleanup`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Cleanup timeout')), 2000))
+      ]);
+      console.log('Cleanup response:', cleanupResponse.ok);
+    } catch (error) {
+      console.log('Cleanup skipped or timed out:', error.message);
+    }
+
+    console.log('Requesting match from backend...');
 
     // Request match from backend
     const response = await fetch(`${BACKEND_URL}/match/queue`, {
@@ -713,13 +726,20 @@ export async function startGame(token, region = 'north-america') {
       body: JSON.stringify({ region })
     });
 
+    console.log('Match response status:', response.status);
+
     const data = await response.json();
+
+    console.log('Match response data:', data);
 
     if (!data.success) {
       console.error('Failed to join match:', data.error);
       alert('Failed to join match: ' + (data.error || 'Unknown error'));
+      window.location.reload();
       return;
     }
+
+    console.log('Match created/joined successfully');
 
     // Initialize game
     gameState.matchId = data.matchId;
@@ -766,6 +786,7 @@ export async function startGame(token, region = 'north-america') {
   } catch (error) {
     console.error('Error starting game:', error);
     alert('Error starting game: ' + error.message);
+    window.location.reload();
   }
 }
 
