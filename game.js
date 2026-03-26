@@ -671,6 +671,19 @@ export async function startGame(token, region = 'north-america') {
       throw new Error('Three.js failed to load');
     }
 
+    // Cleanup any old match first
+    try {
+      await fetch(`${BACKEND_URL}/match/cleanup`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+    } catch (error) {
+      console.log('Cleanup skipped (first game)');
+    }
+
     // Create canvas
     const canvas = document.createElement('canvas');
     canvas.id = 'gameCanvas';
