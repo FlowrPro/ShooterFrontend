@@ -147,12 +147,14 @@ class FPSGame {
     this.isRunning = false;
     this.lastTimerUpdate = 0;
     this.matchPlayers = [];
+    this.lastPlayerFetchTime = 0;
+    this.playerFetchInterval = 0.5; // Fetch players every 0.5 seconds
 
     // Player physics
     this.playerHeight = 1.6;
     this.crouchHeight = 1.0;
-    this.currentHeight = this.playerHeight;
-    this.velocity = { x: 0, y: 0, z: 0 };
+    this.targetHeight = this.playerHeight;
+    this.velocity = { y: 0 };
     this.isJumping = false;
     this.gravity = 9.8;
     this.jumpForce = 8;
@@ -454,6 +456,12 @@ class FPSGame {
             this.removeRemotePlayer(userId);
           }
         }
+
+        // Update player count in unlock screen
+        if (data.match && data.match.players) {
+          this.matchPlayers = data.match.players;
+          this.updatePlayersList();
+        }
       }
     } catch (error) {
       console.error('Failed to fetch remote players:', error);
@@ -593,6 +601,7 @@ class FPSGame {
     hudTopRight.innerHTML = `
       <div id="matchTimer" style="font-size: 20px; font-weight: bold;">5:00</div>
       <div style="font-size: 12px; color: #00aa00;">MATCH TIME</div>
+      <div id="playerCount" style="font-size: 12px; color: #00aa00; margin-top: 5px;">PLAYERS: 1/8</div>
     `;
     uiContainer.appendChild(hudTopRight);
 
@@ -752,7 +761,6 @@ class FPSGame {
       hudBottomRight.style.opacity = '0';
       escapeHint.style.opacity = '0';
       unlockScreen.style.display = 'block';
-      this.updatePlayersList();
     }
   }
 
@@ -772,6 +780,12 @@ class FPSGame {
       html = '<div style="color: #888; font-size: 12px;">No players in match</div>';
     }
     playersList.innerHTML = html;
+
+    // Update player count in HUD
+    const playerCount = document.getElementById('playerCount');
+    if (playerCount && this.matchPlayers) {
+      playerCount.textContent = `PLAYERS: ${this.matchPlayers.length}/8`;
+    }
   }
 
   updateUI() {
@@ -875,8 +889,10 @@ class FPSGame {
     // Update bullets
     this.updateBullets(deltaTime);
 
-    // Fetch remote players every frame (optimized frequency)
-    if (Math.floor(this.gameTime * 5) % 1 === 0) {
+    // Fetch remote players frequently
+    this.lastPlayerFetchTime += deltaTime;
+    if (this.lastPlayerFetchTime >= this.playerFetchInterval) {
+      this.lastPlayerFetchTime = 0;
       this.fetchRemotePlayers();
     }
 
@@ -914,24 +930,24 @@ class FPSGame {
     this.camera.position.y += this.velocity.y * deltaTime;
 
     // Check if on ground
-    if (this.camera.position.y <= this.groundLevel + this.currentHeight) {
-      this.camera.position.y = this.groundLevel + this.currentHeight;
+    if (this.camera.position.y <= this.groundLevel + this.targetHeight) {
+      this.camera.position.y = this.groundLevel + this.targetHeight;
       this.velocity.y = 0;
       this.isJumping = false;
     }
 
-    // Handle crouching
+    // Handle crouching - update target height
     if (this.input.crouch) {
-      this.currentHeight = this.crouchHeight;
+      this.targetHeight = this.crouchHeight;
     } else {
-      this.currentHeight = this.playerHeight;
+      this.targetHeight = this.playerHeight;
     }
 
-    // Smooth camera height transition
-    const targetY = this.groundLevel + this.currentHeight;
+    // Update camera Y position to match target height smoothly
+    const targetY = this.groundLevel + this.targetHeight;
     const currentY = this.camera.position.y;
     if (Math.abs(currentY - targetY) > 0.01) {
-      this.camera.position.y += (targetY - currentY) * 0.1;
+      this.camera.position.y += (targetY - currentY) * 0.15;
     } else {
       this.camera.position.y = targetY;
     }
@@ -1210,6 +1226,7 @@ export async function startGame(token, region = 'north-america') {
 
     // Update UI visibility
     game.updateUIVisibility();
+    game.updatePlayersList();
 
     // Game loop
     let lastTime = Date.now();
