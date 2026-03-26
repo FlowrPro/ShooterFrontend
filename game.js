@@ -260,6 +260,9 @@ class FPSGame {
     document.addEventListener('mousedown', (e) => this.handleMouseDown(e));
     document.addEventListener('mouseup', (e) => this.handleMouseUp(e));
 
+    // Prevent context menu on right click
+    document.addEventListener('contextmenu', (e) => e.preventDefault());
+
     // Click to lock pointer
     document.addEventListener('click', () => {
       this.controls.lock();
@@ -281,7 +284,10 @@ class FPSGame {
     if (key === 'a') this.input.left = true;
     if (key === 's') this.input.backward = true;
     if (key === 'd') this.input.right = true;
-    if (key === ' ') this.input.jump = true;
+    if (key === ' ') {
+      this.input.jump = true;
+      e.preventDefault();
+    }
     if (key === 'shift') this.input.crouch = true;
   }
 
@@ -333,6 +339,7 @@ class FPSGame {
       border: 2px solid #00ff00;
       border-radius: 50%;
       box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
+      pointer-events: none;
     `;
     uiContainer.appendChild(crosshair);
 
@@ -347,6 +354,7 @@ class FPSGame {
       border: 2px solid #00ff00;
       padding: 10px;
       min-width: 200px;
+      pointer-events: none;
     `;
     hudTop.innerHTML = `
       <div style="font-size: 14px; margin-bottom: 5px;">ASSAULT RIFLE</div>
@@ -366,6 +374,7 @@ class FPSGame {
       padding: 10px;
       text-align: center;
       min-width: 150px;
+      pointer-events: none;
     `;
     hudTopRight.innerHTML = `
       <div id="matchTimer" style="font-size: 20px; font-weight: bold;">5:00</div>
@@ -384,6 +393,7 @@ class FPSGame {
       border: 2px solid #00ff00;
       padding: 10px;
       min-width: 200px;
+      pointer-events: none;
     `;
     hudBottom.innerHTML = `
       <div id="healthBar" style="margin-bottom: 10px;">
@@ -409,6 +419,7 @@ class FPSGame {
       max-height: 200px;
       overflow-y: auto;
       min-width: 250px;
+      pointer-events: none;
     `;
     hudBottomRight.innerHTML = `
       <div style="font-size: 12px; margin-bottom: 5px;">KILL FEED</div>
@@ -416,7 +427,30 @@ class FPSGame {
     `;
     uiContainer.appendChild(hudBottomRight);
 
+    // ESC to exit game
+    const escapeHint = document.createElement('div');
+    escapeHint.style.cssText = `
+      position: fixed;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.7);
+      border: 1px solid #00ff00;
+      padding: 5px 10px;
+      font-size: 12px;
+      pointer-events: none;
+    `;
+    escapeHint.textContent = 'Press ESC to exit game';
+    uiContainer.appendChild(escapeHint);
+
     document.body.appendChild(uiContainer);
+
+    // Handle ESC key to exit
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        leaveGame();
+      }
+    });
   }
 
   updateUI() {
@@ -512,9 +546,13 @@ class FPSGame {
     }
 
     if (this.input.jump) {
-      // Simple jump (would need proper physics for production)
-      this.camera.position.y += 0.5;
+      this.camera.position.y += 0.15;
       this.input.jump = false;
+    }
+
+    // Gravity
+    if (this.camera.position.y > 1.6) {
+      this.camera.position.y -= 0.1;
     }
 
     // Update local player state
@@ -639,7 +677,6 @@ class FPSGame {
   endGame() {
     this.isRunning = false;
     console.log('Match ended!');
-    // TODO: Show end screen with stats
   }
 
   render() {
@@ -647,7 +684,9 @@ class FPSGame {
   }
 
   dispose() {
+    this.controls.disconnect();
     this.renderer.dispose();
+    this.renderer.forceContextLoss();
     document.getElementById('gameUI')?.remove();
   }
 }
@@ -680,6 +719,7 @@ export async function startGame(token, region = 'north-america') {
 
     if (!data.success) {
       console.error('Failed to join match:', data.error);
+      alert('Failed to join match: ' + (data.error || 'Unknown error'));
       return;
     }
 
@@ -710,6 +750,8 @@ export async function startGame(token, region = 'north-america') {
     // Game loop
     let lastTime = Date.now();
     const gameLoop = () => {
+      if (!game.isRunning) return;
+
       const now = Date.now();
       const deltaTime = (now - lastTime) / 1000;
       lastTime = now;
@@ -725,6 +767,7 @@ export async function startGame(token, region = 'north-america') {
     console.log('🎮 Game started!', data);
   } catch (error) {
     console.error('Error starting game:', error);
+    alert('Error starting game: ' + error.message);
   }
 }
 
@@ -735,6 +778,10 @@ export function leaveGame() {
   gameState.isInGame = false;
   gameState.matchId = null;
   gameState.playerId = null;
+  gameState.gameInstance = null;
+  
+  // Reload the app
+  window.location.reload();
 }
 
 export function isInGame() {
