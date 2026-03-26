@@ -3,7 +3,15 @@
 // Three.js FPS Implementation
 // ===========================
 
-import * as THREE from 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+const THREE = window.THREE;
+
+// Load Three.js from CDN if not already loaded
+if (!THREE) {
+  const script = document.createElement('script');
+  script.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+  script.async = true;
+  document.head.appendChild(script);
+}
 
 const PointerLockControls = (function() {
   class PointerLockControls {
@@ -697,6 +705,17 @@ class FPSGame {
 
 export async function startGame(token, region = 'north-america') {
   try {
+    // Wait for THREE.js to load if needed
+    let attempts = 0;
+    while (!window.THREE && attempts < 50) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      attempts++;
+    }
+
+    if (!window.THREE) {
+      throw new Error('Three.js failed to load');
+    }
+
     // Create canvas
     const canvas = document.createElement('canvas');
     canvas.id = 'gameCanvas';
