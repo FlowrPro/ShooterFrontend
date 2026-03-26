@@ -1,6 +1,4 @@
-// ===========================
-// Moborr.io Game Engine (Client-Side Only)
-// ===========================
+// Updated game.js - for combined server
 
 import { authToken, currentUser } from './auth.js';
 
@@ -21,7 +19,7 @@ let gameState = {
   keys: {},
   ws: null,
   lastInputTime: 0,
-  inputDelay: 50 // ms between sending inputs to avoid spam
+  inputDelay: 50
 };
 
 const canvas = document.getElementById('gameCanvas');
@@ -198,7 +196,6 @@ function gameLoop() {
     drawPlayer(player, false);
   });
 
-  // Debug info
   ctx.fillStyle = '#ffffff';
   ctx.font = '12px Arial';
   ctx.textAlign = 'left';
@@ -220,14 +217,17 @@ function setupKeyboardInput() {
 }
 
 function connectWebSocket() {
-  const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsURL = `${wsProtocol}//${process.env.BACKEND_URL || 'localhost:3000'}`;
+  // For production, detect from window.location
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const host = window.location.host; // This will be your Render URL
+  const wsURL = `${protocol}//${host}`;
+
+  console.log(`Connecting to WebSocket: ${wsURL}`);
 
   gameState.ws = new WebSocket(wsURL);
 
   gameState.ws.onopen = () => {
     console.log('🟢 Connected to game server');
-    // Send initial player data
     gameState.ws.send(JSON.stringify({
       type: 'join',
       token: authToken,
@@ -240,7 +240,6 @@ function connectWebSocket() {
       const message = JSON.parse(event.data);
 
       if (message.type === 'playerJoined') {
-        // Another player joined
         gameState.otherPlayers.set(message.playerId, {
           id: message.playerId,
           username: message.username,
@@ -251,13 +250,10 @@ function connectWebSocket() {
       } else if (message.type === 'playerLeft') {
         gameState.otherPlayers.delete(message.playerId);
       } else if (message.type === 'playerUpdate') {
-        // Update position from server
         if (message.playerId === currentUser.id) {
-          // Local player position (authoritative)
           gameState.localPlayer.x = message.x;
           gameState.localPlayer.y = message.y;
         } else {
-          // Other player position
           const player = gameState.otherPlayers.get(message.playerId);
           if (player) {
             player.x = message.x;
@@ -265,7 +261,6 @@ function connectWebSocket() {
           }
         }
       } else if (message.type === 'gameState') {
-        // Full game state update
         gameState.localPlayer = {
           id: message.you.id,
           username: message.you.username,
@@ -298,7 +293,7 @@ function connectWebSocket() {
 
   gameState.ws.onclose = () => {
     console.log('🔴 Disconnected from game server');
-    setTimeout(connectWebSocket, 3000); // Reconnect after 3 seconds
+    setTimeout(connectWebSocket, 3000);
   };
 }
 
@@ -314,7 +309,6 @@ export function initializeGame() {
 
   connectWebSocket();
 
-  // Send inputs periodically
   setInterval(sendInputToServer, gameState.inputDelay);
 
   console.log('🎮 Game initialized! Connecting to server...');
