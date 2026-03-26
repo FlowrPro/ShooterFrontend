@@ -20,6 +20,11 @@ const PointerLockControls = (function() {
       this.domElement = domElement;
       this.isLocked = false;
       this.PI_2 = Math.PI / 2;
+      this.pitchObject = new THREE.Object3D();
+      this.yawObject = new THREE.Object3D();
+      
+      this.yawObject.add(this.pitchObject);
+      this.pitchObject.add(camera);
 
       const onMouseMove = (event) => {
         if (!this.isLocked) return;
@@ -27,19 +32,9 @@ const PointerLockControls = (function() {
         const movementX = event.movementX || event.mozMovementX || event.webkitMovementX || 0;
         const movementY = event.movementY || event.mozMovementY || event.webkitMovementY || 0;
 
-        // Rotate camera using quaternions
-        const quat = new THREE.Quaternion();
-        
-        // Rotate around Y axis (horizontal mouse movement)
-        quat.setFromAxisAngle(new THREE.Vector3(0, 1, 0), -movementX * 0.002);
-        camera.quaternion.multiplyQuaternions(quat, camera.quaternion);
-
-        // Rotate around local X axis (vertical mouse movement)
-        const euler = new THREE.Euler(0, 0, 0, 'YXZ');
-        euler.setFromQuaternion(camera.quaternion);
-        euler.rotateX(-movementY * 0.002);
-        euler.x = Math.max(-this.PI_2, Math.min(this.PI_2, euler.x));
-        camera.quaternion.setFromEuler(euler);
+        this.yawObject.rotation.y -= movementX * 0.002;
+        this.pitchObject.rotation.x -= movementY * 0.002;
+        this.pitchObject.rotation.x = Math.max(-this.PI_2, Math.min(this.PI_2, this.pitchObject.rotation.x));
       };
 
       const onPointerlockChange = () => {
@@ -66,7 +61,7 @@ const PointerLockControls = (function() {
       };
 
       this.getObject = function() {
-        return camera;
+        return this.yawObject;
       };
 
       this.lock = function() {
@@ -93,6 +88,12 @@ const PointerLockControls = (function() {
         const direction = new THREE.Vector3(1, 0, 0);
         direction.applyQuaternion(camera.quaternion);
         camera.position.addScaledVector(direction, distance);
+      };
+
+      this.getDirection = function(v) {
+        v = v || new THREE.Vector3(0, 0, -1);
+        v.applyQuaternion(camera.quaternion);
+        return v;
       };
     }
   }
@@ -135,6 +136,7 @@ class FPSGame {
     this.matchDuration = 5 * 60; // 5 minutes in seconds
     this.isRunning = false;
     this.lastTimerUpdate = 0;
+    this.matchPlayers = [];
 
     // Player physics
     this.playerHeight = 1.6;
@@ -315,8 +317,9 @@ class FPSGame {
       color: #00ff00;
     `;
 
-    // Crosshair
+    // Crosshair (only visible when locked)
     const crosshair = document.createElement('div');
+    crosshair.id = 'crosshair';
     crosshair.style.cssText = `
       position: fixed;
       top: 50%;
@@ -328,6 +331,8 @@ class FPSGame {
       border-radius: 50%;
       box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
       pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s;
     `;
     uiContainer.appendChild(crosshair);
 
@@ -343,6 +348,8 @@ class FPSGame {
       padding: 10px;
       min-width: 200px;
       pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s;
     `;
     hudTop.innerHTML = `
       <div style="font-size: 14px; margin-bottom: 5px;">ASSAULT RIFLE</div>
@@ -364,6 +371,8 @@ class FPSGame {
       text-align: center;
       min-width: 150px;
       pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s;
     `;
     hudTopRight.innerHTML = `
       <div id="matchTimer" style="font-size: 20px; font-weight: bold;">5:00</div>
@@ -383,6 +392,8 @@ class FPSGame {
       padding: 10px;
       min-width: 200px;
       pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s;
     `;
     hudBottom.innerHTML = `
       <div id="healthBar" style="margin-bottom: 10px;">
@@ -409,6 +420,8 @@ class FPSGame {
       overflow-y: auto;
       min-width: 250px;
       pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s;
     `;
     hudBottomRight.innerHTML = `
       <div style="font-size: 12px; margin-bottom: 5px;">KILL FEED</div>
@@ -416,8 +429,45 @@ class FPSGame {
     `;
     uiContainer.appendChild(hudBottomRight);
 
-    // ESC to exit game
+    // Unlock screen (shown when pointer not locked)
+    const unlockScreen = document.createElement('div');
+    unlockScreen.id = 'unlockScreen';
+    unlockScreen.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.9);
+      border: 2px solid #00ff00;
+      padding: 20px;
+      min-width: 300px;
+      pointer-events: auto;
+      z-index: 101;
+    `;
+    unlockScreen.innerHTML = `
+      <div style="font-size: 18px; font-weight: bold; margin-bottom: 15px; color: #00ff00;">PLAYERS IN MATCH</div>
+      <div id="playersList" style="margin-bottom: 15px; max-height: 300px; overflow-y: auto;">
+        <div style="color: #888; font-size: 12px;">Loading players...</div>
+      </div>
+      <button id="leaveGameBtn" style="
+        width: 100%;
+        background: #ff3333;
+        color: white;
+        border: 2px solid #ff0000;
+        padding: 10px;
+        font-weight: bold;
+        cursor: pointer;
+        border-radius: 5px;
+        font-family: 'Orbitron', monospace;
+        font-size: 14px;
+        pointer-events: auto;
+      ">LEAVE GAME (ESC)</button>
+      <div style="font-size: 11px; color: #888; margin-top: 10px; text-align: center;">Click in game to lock pointer</div>
+    `;
+    uiContainer.appendChild(unlockScreen);
+
+    // ESC to exit/unlock hint
     const escapeHint = document.createElement('div');
+    escapeHint.id = 'escapeHint';
     escapeHint.style.cssText = `
       position: fixed;
       bottom: 10px;
@@ -428,18 +478,84 @@ class FPSGame {
       padding: 5px 10px;
       font-size: 12px;
       pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s;
     `;
-    escapeHint.textContent = 'Press ESC to exit | WASD Move | SPACE Jump | SHIFT Crouch | R Reload';
+    escapeHint.textContent = 'Press ESC to unlock | WASD Move | SPACE Jump | SHIFT Crouch | R Reload | MOUSE Look';
     uiContainer.appendChild(escapeHint);
 
     document.body.appendChild(uiContainer);
 
-    // Handle ESC key to exit
+    // Handle leave game button
+    document.getElementById('leaveGameBtn').addEventListener('click', () => {
+      leaveGame();
+    }, { passive: true });
+
+    // Handle ESC key to unlock/exit
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
-        leaveGame();
+        if (document.pointerLockElement) {
+          this.controls.unlock();
+        } else {
+          leaveGame();
+        }
       }
     });
+
+    // Handle pointer lock changes to show/hide UI
+    document.addEventListener('pointerlockchange', () => {
+      this.updateUIVisibility();
+    });
+  }
+
+  updateUIVisibility() {
+    const isLocked = document.pointerLockElement === document.body;
+    const crosshair = document.getElementById('crosshair');
+    const hudTop = document.getElementById('hudTop');
+    const hudTopRight = document.getElementById('hudTopRight');
+    const hudBottom = document.getElementById('hudBottom');
+    const hudBottomRight = document.getElementById('hudBottomRight');
+    const escapeHint = document.getElementById('escapeHint');
+    const unlockScreen = document.getElementById('unlockScreen');
+
+    if (isLocked) {
+      // Show game HUD
+      crosshair.style.opacity = '1';
+      hudTop.style.opacity = '1';
+      hudTopRight.style.opacity = '1';
+      hudBottom.style.opacity = '1';
+      hudBottomRight.style.opacity = '1';
+      escapeHint.style.opacity = '1';
+      unlockScreen.style.display = 'none';
+    } else {
+      // Hide game HUD, show unlock screen
+      crosshair.style.opacity = '0';
+      hudTop.style.opacity = '0';
+      hudTopRight.style.opacity = '0';
+      hudBottom.style.opacity = '0';
+      hudBottomRight.style.opacity = '0';
+      escapeHint.style.opacity = '0';
+      unlockScreen.style.display = 'block';
+      this.updatePlayersList();
+    }
+  }
+
+  updatePlayersList() {
+    const playersList = document.getElementById('playersList');
+    if (!playersList) return;
+
+    let html = '';
+    if (this.matchPlayers && this.matchPlayers.length > 0) {
+      this.matchPlayers.forEach(player => {
+        const isYou = player.userId === this.localPlayer?.userId;
+        const color = isYou ? '#00ff00' : '#ffffff';
+        const label = isYou ? ' (YOU)' : '';
+        html += `<div style="color: ${color}; padding: 5px; border-bottom: 1px solid #333;">${player.username}${label}</div>`;
+      });
+    } else {
+      html = '<div style="color: #888; font-size: 12px;">No players in match</div>';
+    }
+    playersList.innerHTML = html;
   }
 
   updateUI() {
@@ -553,8 +669,8 @@ class FPSGame {
     const speed = this.input.crouch ? 3 : 6;
     const direction = new THREE.Vector3();
 
-    if (this.input.forward) direction.z += 1;
-    if (this.input.backward) direction.z -= 1;
+    if (this.input.forward) direction.z -= 1;
+    if (this.input.backward) direction.z += 1;
     if (this.input.left) direction.x -= 1;
     if (this.input.right) direction.x += 1;
 
@@ -626,7 +742,7 @@ class FPSGame {
     this.weapon.ammo -= 1;
     this.weapon.lastShotTime = now;
 
-    // Get ray from camera
+    // Get ray from camera position (where the player is, not offset)
     const rayOrigin = this.camera.position.clone();
     const rayDirection = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
 
@@ -849,7 +965,8 @@ export async function startGame(token, region = 'north-america') {
 
     // Set up local player
     game.localPlayer = {
-      id: data.playerId,
+      userId: data.gameState.players[Object.keys(data.gameState.players)[0]]?.userId,
+      username: Object.values(data.gameState.players)[0]?.username,
       hp: 100,
       kills: 0,
       deaths: 0,
@@ -857,9 +974,15 @@ export async function startGame(token, region = 'north-america') {
       rotation: { x: 0, y: 0 }
     };
 
+    // Store all players in match
+    game.matchPlayers = data.match?.players || [];
+
     game.matchId = data.matchId;
     game.playerId = data.playerId;
     game.isRunning = true;
+
+    // Update UI visibility
+    game.updateUIVisibility();
 
     // Game loop
     let lastTime = Date.now();
