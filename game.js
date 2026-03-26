@@ -253,6 +253,213 @@ class FPSGame {
     });
   }
 
+  createBlockyPlayerMesh(username, color = 0xff0000) {
+    const group = new THREE.Group();
+
+    // Body (main torso)
+    const bodyGeometry = new THREE.BoxGeometry(0.4, 0.6, 0.25);
+    const bodyMaterial = new THREE.MeshStandardMaterial({ color: color });
+    const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+    body.castShadow = true;
+    body.receiveShadow = true;
+    body.position.y = 0.3;
+    group.add(body);
+
+    // Head
+    const headGeometry = new THREE.BoxGeometry(0.35, 0.35, 0.35);
+    const headMaterial = new THREE.MeshStandardMaterial({ color: 0xffb399 }); // Skin tone
+    const head = new THREE.Mesh(headGeometry, headMaterial);
+    head.castShadow = true;
+    head.receiveShadow = true;
+    head.position.y = 0.95;
+    group.add(head);
+
+    // Eyes
+    const eyeGeometry = new THREE.BoxGeometry(0.08, 0.08, 0.05);
+    const eyeMaterial = new THREE.MeshStandardMaterial({ color: 0x000000 });
+    const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+    leftEye.position.set(-0.08, 1.0, 0.18);
+    group.add(leftEye);
+    const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+    rightEye.position.set(0.08, 1.0, 0.18);
+    group.add(rightEye);
+
+    // Left Arm
+    const armGeometry = new THREE.BoxGeometry(0.15, 0.5, 0.15);
+    const armMaterial = new THREE.MeshStandardMaterial({ color: color });
+    const leftArm = new THREE.Mesh(armGeometry, armMaterial);
+    leftArm.castShadow = true;
+    leftArm.receiveShadow = true;
+    leftArm.position.set(-0.28, 0.5, 0);
+    leftArm.rotation.z = 0.3;
+    group.add(leftArm);
+
+    // Right Arm
+    const rightArm = new THREE.Mesh(armGeometry, armMaterial);
+    rightArm.castShadow = true;
+    rightArm.receiveShadow = true;
+    rightArm.position.set(0.28, 0.5, 0);
+    rightArm.rotation.z = -0.3;
+    group.add(rightArm);
+
+    // Left Leg
+    const legGeometry = new THREE.BoxGeometry(0.15, 0.5, 0.15);
+    const legMaterial = new THREE.MeshStandardMaterial({ color: 0x1a3a52 }); // Dark blue pants
+    const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
+    leftLeg.castShadow = true;
+    leftLeg.receiveShadow = true;
+    leftLeg.position.set(-0.15, -0.1, 0);
+    group.add(leftLeg);
+
+    // Right Leg
+    const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
+    rightLeg.castShadow = true;
+    rightLeg.receiveShadow = true;
+    rightLeg.position.set(0.15, -0.1, 0);
+    group.add(rightLeg);
+
+    // Left Hand (small cube at end of arm)
+    const handGeometry = new THREE.BoxGeometry(0.12, 0.12, 0.12);
+    const handMaterial = new THREE.MeshStandardMaterial({ color: 0xffb399 });
+    const leftHand = new THREE.Mesh(handGeometry, handMaterial);
+    leftHand.castShadow = true;
+    leftHand.position.set(-0.3, 0.15, 0);
+    group.add(leftHand);
+
+    // Right Hand
+    const rightHand = new THREE.Mesh(handGeometry, handMaterial);
+    rightHand.castShadow = true;
+    rightHand.position.set(0.3, 0.15, 0);
+    group.add(rightHand);
+
+    // Left Foot (small cube at end of leg)
+    const footGeometry = new THREE.BoxGeometry(0.15, 0.12, 0.2);
+    const footMaterial = new THREE.MeshStandardMaterial({ color: 0x000000 }); // Black shoes
+    const leftFoot = new THREE.Mesh(footGeometry, footMaterial);
+    leftFoot.castShadow = true;
+    leftFoot.position.set(-0.15, -0.35, 0.05);
+    group.add(leftFoot);
+
+    // Right Foot
+    const rightFoot = new THREE.Mesh(footGeometry, footMaterial);
+    rightFoot.castShadow = true;
+    rightFoot.position.set(0.15, -0.35, 0.05);
+    group.add(rightFoot);
+
+    // Name label above head
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = 'black';
+    ctx.fillRect(0, 0, 256, 64);
+    ctx.fillStyle = '#00ff00';
+    ctx.font = 'Bold 40px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(username, 128, 45);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    const labelGeometry = new THREE.PlaneGeometry(1.5, 0.4);
+    const labelMaterial = new THREE.MeshStandardMaterial({ 
+      map: texture, 
+      emissive: 0x00ff00, 
+      emissiveIntensity: 0.3 
+    });
+    const label = new THREE.Mesh(labelGeometry, labelMaterial);
+    label.position.y = 1.4;
+    group.add(label);
+
+    return group;
+  }
+
+  addRemotePlayer(userId, username) {
+    if (this.remotePlayers.has(userId)) return; // Already exists
+
+    const playerMesh = this.createBlockyPlayerMesh(username, 0xff4444); // Red for enemies
+    playerMesh.position.set(Math.random() * 40 - 20, 0, Math.random() * 40 - 20);
+    this.scene.add(playerMesh);
+
+    this.remotePlayers.set(userId, {
+      mesh: playerMesh,
+      username: username,
+      lastPosition: playerMesh.position.clone(),
+      targetPosition: playerMesh.position.clone(),
+      lastUpdate: Date.now(),
+      hp: 100
+    });
+
+    console.log(`Added remote player: ${username}`);
+  }
+
+  updateRemotePlayer(userId, position, rotation, hp) {
+    const player = this.remotePlayers.get(userId);
+    if (!player) return;
+
+    player.targetPosition = new THREE.Vector3(position.x, position.y, position.z);
+    player.lastUpdate = Date.now();
+    player.hp = hp || 100;
+
+    // Smooth interpolation towards target position
+    player.mesh.position.lerp(player.targetPosition, 0.1);
+    
+    if (rotation) {
+      player.mesh.rotation.y = rotation.y;
+      player.mesh.rotation.x = rotation.x * 0.2; // Reduce head tilt for smoother look
+    }
+  }
+
+  removeRemotePlayer(userId) {
+    const player = this.remotePlayers.get(userId);
+    if (player) {
+      this.scene.remove(player.mesh);
+      this.remotePlayers.delete(userId);
+      console.log(`Removed remote player: ${player.username}`);
+    }
+  }
+
+  async fetchRemotePlayers() {
+    if (!this.matchId) return;
+
+    try {
+      const response = await fetch(`${BACKEND_URL}/match/${this.matchId}`, {
+        headers: {
+          'Authorization': `Bearer ${this.token}`
+        }
+      });
+
+      const data = await response.json();
+      
+      if (data.success && data.match && data.match.gameState && data.match.gameState.players) {
+        const playersData = data.match.gameState.players;
+        
+        // Track which players we've seen
+        const currentPlayerIds = new Set();
+
+        // Update or create remote players
+        for (const [playerId, playerState] of Object.entries(playersData)) {
+          if (playerState.userId === this.localPlayer?.userId) continue; // Skip self
+
+          currentPlayerIds.add(playerState.userId);
+
+          if (!this.remotePlayers.has(playerState.userId)) {
+            this.addRemotePlayer(playerState.userId, playerState.username);
+          }
+          
+          this.updateRemotePlayer(playerState.userId, playerState.position, playerState.rotation, playerState.hp);
+        }
+
+        // Remove players that are no longer in the match
+        for (const [userId] of this.remotePlayers) {
+          if (!currentPlayerIds.has(userId)) {
+            this.removeRemotePlayer(userId);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch remote players:', error);
+    }
+  }
+
   setupControls() {
     this.controls = new PointerLockControls(this.camera, document.body);
   }
@@ -668,6 +875,11 @@ class FPSGame {
     // Update bullets
     this.updateBullets(deltaTime);
 
+    // Fetch remote players every frame (optimized frequency)
+    if (Math.floor(this.gameTime * 5) % 1 === 0) {
+      this.fetchRemotePlayers();
+    }
+
     // Send position to server periodically
     if (Math.floor(this.gameTime * 10) % 5 === 0) {
       this.sendPositionUpdate();
@@ -879,6 +1091,12 @@ class FPSGame {
   }
 
   dispose() {
+    // Remove all remote players
+    for (const [userId, player] of this.remotePlayers) {
+      this.scene.remove(player.mesh);
+    }
+    this.remotePlayers.clear();
+
     this.controls.dispose();
     this.renderer.dispose();
     this.renderer.forceContextLoss();
