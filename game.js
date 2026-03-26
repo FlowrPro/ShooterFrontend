@@ -20,11 +20,11 @@ const PointerLockControls = (function() {
       this.domElement = domElement;
       this.isLocked = false;
       this.PI_2 = Math.PI / 2;
-      this.pitchObject = new THREE.Object3D();
-      this.yawObject = new THREE.Object3D();
       
-      this.yawObject.add(this.pitchObject);
-      this.pitchObject.add(camera);
+      // Store euler angles for proper FPS camera control
+      this.euler = new THREE.Euler(0, 0, 0, 'YXZ');
+      this.yaw = 0;
+      this.pitch = 0;
 
       const onMouseMove = (event) => {
         if (!this.isLocked) return;
@@ -32,9 +32,19 @@ const PointerLockControls = (function() {
         const movementX = event.movementX || event.mozMovementX || event.webkitMovementX || 0;
         const movementY = event.movementY || event.mozMovementY || event.webkitMovementY || 0;
 
-        this.yawObject.rotation.y -= movementX * 0.002;
-        this.pitchObject.rotation.x -= movementY * 0.002;
-        this.pitchObject.rotation.x = Math.max(-this.PI_2, Math.min(this.PI_2, this.pitchObject.rotation.x));
+        // Update yaw and pitch
+        this.yaw -= movementX * 0.002;
+        this.pitch -= movementY * 0.002;
+
+        // Clamp pitch to prevent flipping
+        this.pitch = Math.max(-this.PI_2, Math.min(this.PI_2, this.pitch));
+
+        // Apply rotations to camera
+        this.euler.order = 'YXZ';
+        this.euler.setFromQuaternion(camera.quaternion);
+        this.euler.y = this.yaw;
+        this.euler.x = this.pitch;
+        camera.quaternion.setFromEuler(this.euler);
       };
 
       const onPointerlockChange = () => {
@@ -61,7 +71,7 @@ const PointerLockControls = (function() {
       };
 
       this.getObject = function() {
-        return this.yawObject;
+        return camera;
       };
 
       this.lock = function() {
@@ -245,7 +255,6 @@ class FPSGame {
 
   setupControls() {
     this.controls = new PointerLockControls(this.camera, document.body);
-    this.scene.add(this.controls.getObject());
   }
 
   setupInput() {
