@@ -2,7 +2,7 @@
 // Moborr.io Authentication Module
 // ===========================
 
-const BACKEND_URL = 'https://moborr-backend.onrender.com';
+const BACKEND_URL = window.location.origin; // Auto-detects Render URL or localhost
 
 export let currentUser = null;
 export let authToken = null;
