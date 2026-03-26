@@ -553,8 +553,8 @@ class FPSGame {
     const speed = this.input.crouch ? 3 : 6;
     const direction = new THREE.Vector3();
 
-    if (this.input.forward) direction.z -= 1;
-    if (this.input.backward) direction.z += 1;
+    if (this.input.forward) direction.z += 1;
+    if (this.input.backward) direction.z -= 1;
     if (this.input.left) direction.x -= 1;
     if (this.input.right) direction.x += 1;
 
