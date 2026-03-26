@@ -13,7 +13,7 @@ import {
   isLoggedIn 
 } from './auth.js';
 
-import { joinQueue, leaveQueue, isInQueue, getQueueStatus } from './game.js';
+import { joinQueue, leaveQueue, isInQueue, getQueueStatus } from './queue.js';
 import { startGame, leaveGame, isInGame } from './game.js';
 
 function renderSidebar() {
@@ -23,11 +23,11 @@ function renderSidebar() {
   return `
     <nav class="sidebar flex flex-col gap-4 bg-black bg-opacity-60 text-white w-44 p-4 min-h-screen shadow-xl border-r border-purple-500 border-opacity-30">
       <button class="nav-item-btn flex items-center mb-6 pb-4 border-b border-purple-400 border-opacity-30 w-full hover:bg-purple-600 hover:bg-opacity-50 rounded p-2 transition overflow-hidden" data-modal="profile">
-  <div class="text-3xl mr-2 flex-shrink-0">${profileAvatar}</div>
-  <div class="text-left min-w-0">
-    <div class="font-bold text-sm truncate">${profileName}</div>
-  </div>
-</button>
+        <div class="text-3xl mr-2 flex-shrink-0">${profileAvatar}</div>
+        <div class="text-left min-w-0">
+          <div class="font-bold text-sm truncate">${profileName}</div>
+        </div>
+      </button>
       <button class="nav-item-btn active py-2 px-3 rounded flex items-center gap-2 hover:bg-purple-600 hover:bg-opacity-50 transition" data-modal="hub">
         🏠 <span>Hub</span>
       </button>
@@ -83,7 +83,7 @@ function renderCenter() {
           <img src="./assets/logo.png" class="w-48 h-48 object-contain drop-shadow-lg" alt="Moborr Logo"/>
         </div>
         <button id="playBtn" class="bg-yellow-400 hover:bg-yellow-300 active:bg-yellow-500 text-black font-black rounded-full px-12 py-4 text-2xl shadow-lg transition transform hover:scale-105 mb-6">
-          ${isInQueue() ? '⏳ QUEUED' : '► PLAY NOW'}
+          ${isInGame() ? '🎮 IN GAME' : '► PLAY NOW'}
         </button>
         <div class="flex justify-center gap-3 mb-6">
           <button class="center-btn bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded font-bold transition" data-modal="leaderboards">Leaderboards</button>
@@ -346,7 +346,6 @@ function setupEventListeners() {
 
     if (isInGame()) {
       leaveGame();
-      renderApp();
       return;
     }
 
