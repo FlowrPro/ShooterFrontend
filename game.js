@@ -19,7 +19,6 @@ const PointerLockControls = (function() {
       this.camera = camera;
       this.domElement = domElement;
       this.isLocked = false;
-      this.euler = new THREE.Euler(0, 0, 0, 'YXZ');
       this.PI_2 = Math.PI / 2;
 
       const onMouseMove = (event) => {
@@ -28,11 +27,19 @@ const PointerLockControls = (function() {
         const movementX = event.movementX || event.mozMovementX || event.webkitMovementX || 0;
         const movementY = event.movementY || event.mozMovementY || event.webkitMovementY || 0;
 
-        this.euler.setFromQuaternion(camera.quaternion);
-        this.euler.rotateY(-movementX * 0.002);
-        this.euler.rotateX(-movementY * 0.002);
-        this.euler.x = Math.max(-this.PI_2, Math.min(this.PI_2, this.euler.x));
-        camera.quaternion.setFromEuler(this.euler);
+        // Rotate camera using quaternions
+        const quat = new THREE.Quaternion();
+        
+        // Rotate around Y axis (horizontal mouse movement)
+        quat.setFromAxisAngle(new THREE.Vector3(0, 1, 0), -movementX * 0.002);
+        camera.quaternion.multiplyQuaternions(quat, camera.quaternion);
+
+        // Rotate around local X axis (vertical mouse movement)
+        const euler = new THREE.Euler(0, 0, 0, 'YXZ');
+        euler.setFromQuaternion(camera.quaternion);
+        euler.rotateX(-movementY * 0.002);
+        euler.x = Math.max(-this.PI_2, Math.min(this.PI_2, euler.x));
+        camera.quaternion.setFromEuler(euler);
       };
 
       const onPointerlockChange = () => {
@@ -126,6 +133,7 @@ class FPSGame {
     this.gameTime = 0;
     this.matchDuration = 5 * 60; // 5 minutes in seconds
     this.isRunning = false;
+    this.lastTimerUpdate = 0;
 
     // Input state
     this.input = {
@@ -442,13 +450,16 @@ class FPSGame {
       }
     }
 
-    // Update match timer
-    const matchTimer = document.getElementById('matchTimer');
-    if (matchTimer) {
-      const remaining = this.matchDuration - this.gameTime;
-      const mins = Math.floor(remaining / 60);
-      const secs = remaining % 60;
-      matchTimer.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+    // Update match timer (only update every 500ms to avoid glitching)
+    if (Date.now() - this.lastTimerUpdate > 500) {
+      this.lastTimerUpdate = Date.now();
+      const matchTimer = document.getElementById('matchTimer');
+      if (matchTimer) {
+        const remaining = Math.max(0, this.matchDuration - Math.floor(this.gameTime));
+        const mins = Math.floor(remaining / 60);
+        const secs = remaining % 60;
+        matchTimer.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+      }
     }
   }
 
