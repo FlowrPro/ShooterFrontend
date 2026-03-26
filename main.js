@@ -14,6 +14,7 @@ import {
 } from './auth.js';
 
 import { joinQueue, leaveQueue, isInQueue, getQueueStatus } from './game.js';
+import { startGame, leaveGame, isInGame } from './game.js';
 
 function renderSidebar() {
   const profileName = isLoggedIn() ? currentUser.username : 'Login/Register';
@@ -123,10 +124,10 @@ function renderRightPanel() {
       <div>
         <div class="font-bold mb-2 text-sm">🌍 Region</div>
         <div class="bg-gray-800 bg-opacity-50 rounded p-2">
-          <select class="w-full bg-gray-900 text-white px-2 py-1 rounded text-sm">
-            <option>🌍 North America</option>
-            <option>🌍 Europe</option>
-            <option>🌍 Asia</option>
+          <select id="regionSelect" class="w-full bg-gray-900 text-white px-2 py-1 rounded text-sm">
+            <option value="north-america">🌍 North America</option>
+            <option value="europe">🌍 Europe</option>
+            <option value="asia">🌍 Asia</option>
           </select>
         </div>
       </div>
@@ -337,24 +338,28 @@ function setupEventListeners() {
   });
 
   const playBtn = document.getElementById("playBtn");
-  playBtn?.addEventListener("click", () => {
-    if (isInQueue()) {
-      leaveQueue();
+  playBtn?.addEventListener("click", async () => {
+    if (!isLoggedIn()) {
+      alert("❌ Please login first!");
+      return;
+    }
+
+    if (isInGame()) {
+      leaveGame();
       renderApp();
-    } else {
-      joinQueue();
-      renderApp();
-      
-      // Update queue timer every second
-      const queueInterval = setInterval(() => {
-        const timer = document.getElementById("queueTimer");
-        if (timer && isInQueue()) {
-          const status = getQueueStatus();
-          timer.textContent = status.formattedTime;
-        } else {
-          clearInterval(queueInterval);
-        }
-      }, 1000);
+      return;
+    }
+
+    // Get selected region
+    const regionSelect = document.getElementById("regionSelect");
+    const region = regionSelect ? regionSelect.value : 'north-america';
+
+    // Start the game
+    try {
+      await startGame(authToken, region);
+    } catch (error) {
+      console.error('Failed to start game:', error);
+      alert('❌ Failed to start game. Please try again.');
     }
   });
 }
