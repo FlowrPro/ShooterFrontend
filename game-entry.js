@@ -1,21 +1,17 @@
 // ===========================
-// Game Entry Point
+// Game Entry Point (Updated)
 // ===========================
 
 import { initializeGame, gameState, GAME_CONFIG } from './game.js';
 import { currentUser, isLoggedIn, loadUserFromStorage } from './auth.js';
 
-// Load user from storage
 loadUserFromStorage();
 
-// Check if logged in
 if (!isLoggedIn()) {
   window.location.href = './index.html';
 } else {
-  // Initialize game
   initializeGame();
 
-  // Update HUD
   const playerInfo = document.getElementById('playerInfo');
   setInterval(() => {
     if (gameState.localPlayer) {
@@ -27,7 +23,6 @@ if (!isLoggedIn()) {
     }
   }, 500);
 
-  // ESC to return to menu
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       window.location.href = './index.html';
