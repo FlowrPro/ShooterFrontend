@@ -790,10 +790,26 @@ export async function startGame(token, region = 'north-america') {
   }
 }
 
-export function leaveGame() {
+export async function leaveGame() {
   if (gameState.gameInstance) {
     gameState.gameInstance.dispose();
   }
+
+  // Tell server we're leaving the match
+  if (gameState.matchId && gameState.authToken) {
+    try {
+      await fetch(`${BACKEND_URL}/match/${gameState.matchId}/leave`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${gameState.authToken}`
+        }
+      });
+    } catch (error) {
+      console.error('Error leaving match:', error);
+    }
+  }
+
   gameState.isInGame = false;
   gameState.matchId = null;
   gameState.playerId = null;
