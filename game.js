@@ -19,13 +19,8 @@ const PointerLockControls = (function() {
       this.camera = camera;
       this.domElement = domElement;
       this.isLocked = false;
-
-      const euler = new THREE.Euler(0, 0, 0, 'YXZ');
-      const PI_2 = Math.PI / 2;
-
-      const changeEvent = { type: 'change' };
-      const lockEvent = { type: 'lock' };
-      const unlockEvent = { type: 'unlock' };
+      this.euler = new THREE.Euler(0, 0, 0, 'YXZ');
+      this.PI_2 = Math.PI / 2;
 
       const onMouseMove = (event) => {
         if (!this.isLocked) return;
@@ -33,22 +28,20 @@ const PointerLockControls = (function() {
         const movementX = event.movementX || event.mozMovementX || event.webkitMovementX || 0;
         const movementY = event.movementY || event.mozMovementY || event.webkitMovementY || 0;
 
-        euler.setFromQuaternion(camera.quaternion);
-        euler.rotateY(-movementX * 0.002);
-        euler.rotateX(-movementY * 0.002);
-        euler.x = Math.max(-PI_2, Math.min(PI_2, euler.x));
-        camera.quaternion.setFromEuler(euler);
-
-        this.dispatchEvent(changeEvent);
+        this.euler.setFromQuaternion(camera.quaternion);
+        this.euler.rotateY(-movementX * 0.002);
+        this.euler.rotateX(-movementY * 0.002);
+        this.euler.x = Math.max(-this.PI_2, Math.min(this.PI_2, this.euler.x));
+        camera.quaternion.setFromEuler(this.euler);
       };
 
       const onPointerlockChange = () => {
         if (document.pointerLockElement === domElement) {
           this.isLocked = true;
-          this.dispatchEvent(lockEvent);
+          document.addEventListener('mousemove', onMouseMove);
         } else {
           this.isLocked = false;
-          this.dispatchEvent(unlockEvent);
+          document.removeEventListener('mousemove', onMouseMove);
         }
       };
 
@@ -56,20 +49,13 @@ const PointerLockControls = (function() {
         console.error('PointerLock error');
       };
 
-      this.connect = function() {
-        document.addEventListener('mousemove', onMouseMove);
-        document.addEventListener('pointerlockchange', onPointerlockChange);
-        document.addEventListener('pointerlockerror', onPointerlockError);
-      };
-
-      this.disconnect = function() {
-        document.removeEventListener('mousemove', onMouseMove);
-        document.removeEventListener('pointerlockchange', onPointerlockChange);
-        document.removeEventListener('pointerlockerror', onPointerlockError);
-      };
+      document.addEventListener('pointerlockchange', onPointerlockChange);
+      document.addEventListener('pointerlockerror', onPointerlockError);
 
       this.dispose = function() {
-        this.disconnect();
+        document.removeEventListener('pointerlockchange', onPointerlockChange);
+        document.removeEventListener('pointerlockerror', onPointerlockError);
+        document.removeEventListener('mousemove', onMouseMove);
       };
 
       this.getObject = function() {
@@ -90,39 +76,17 @@ const PointerLockControls = (function() {
         }
       };
 
-      this.connect();
+      this.moveForward = function(distance) {
+        const direction = new THREE.Vector3(0, 0, -1);
+        direction.applyQuaternion(camera.quaternion);
+        camera.position.addScaledVector(direction, distance);
+      };
 
-      this._listeners = {};
-    }
-
-    addEventListener(type, listener) {
-      if (!this._listeners[type]) this._listeners[type] = [];
-      this._listeners[type].push(listener);
-    }
-
-    removeEventListener(type, listener) {
-      if (this._listeners[type]) {
-        const index = this._listeners[type].indexOf(listener);
-        if (index > -1) this._listeners[type].splice(index, 1);
-      }
-    }
-
-    dispatchEvent(event) {
-      if (this._listeners[event.type]) {
-        this._listeners[event.type].forEach(listener => listener(event));
-      }
-    }
-
-    moveForward(distance) {
-      const direction = new THREE.Vector3(0, 0, -1);
-      direction.applyQuaternion(this.camera.quaternion);
-      this.camera.position.addScaledVector(direction, distance);
-    }
-
-    moveRight(distance) {
-      const direction = new THREE.Vector3(1, 0, 0);
-      direction.applyQuaternion(this.camera.quaternion);
-      this.camera.position.addScaledVector(direction, distance);
+      this.moveRight = function(distance) {
+        const direction = new THREE.Vector3(1, 0, 0);
+        direction.applyQuaternion(camera.quaternion);
+        camera.position.addScaledVector(direction, distance);
+      };
     }
   }
 
@@ -274,15 +238,6 @@ class FPSGame {
     // Click to lock pointer
     document.addEventListener('click', () => {
       this.controls.lock();
-    });
-
-    // Pointer lock change
-    document.addEventListener('pointerlockchange', () => {
-      if (document.pointerLockElement === document.body) {
-        console.log('Pointer locked');
-      } else {
-        console.log('Pointer unlocked');
-      }
     });
   }
 
@@ -692,7 +647,7 @@ class FPSGame {
   }
 
   dispose() {
-    this.controls.disconnect();
+    this.controls.dispose();
     this.renderer.dispose();
     this.renderer.forceContextLoss();
     document.getElementById('gameUI')?.remove();
