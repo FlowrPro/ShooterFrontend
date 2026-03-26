@@ -19,12 +19,12 @@ function renderSidebar() {
 
   return `
     <nav class="sidebar flex flex-col gap-4 bg-black bg-opacity-60 text-white w-44 p-4 min-h-screen shadow-xl border-r border-purple-500 border-opacity-30">
-      <button class="nav-item-btn flex items-center mb-6 pb-4 border-b border-purple-400 border-opacity-30 w-full hover:bg-purple-600 hover:bg-opacity-50 rounded p-2 transition" data-modal="profile">
-        <div class="text-3xl mr-3">${profileAvatar}</div>
-        <div class="text-left">
-          <div class="font-bold text-sm">${profileName}</div>
-        </div>
-      </button>
+      <button class="nav-item-btn flex items-center mb-6 pb-4 border-b border-purple-400 border-opacity-30 w-full hover:bg-purple-600 hover:bg-opacity-50 rounded p-2 transition overflow-hidden" data-modal="profile">
+  <div class="text-3xl mr-2 flex-shrink-0">${profileAvatar}</div>
+  <div class="text-left min-w-0">
+    <div class="font-bold text-sm truncate">${profileName}</div>
+  </div>
+</button>
       <button class="nav-item-btn active py-2 px-3 rounded flex items-center gap-2 hover:bg-purple-600 hover:bg-opacity-50 transition" data-modal="hub">
         🏠 <span>Hub</span>
       </button>
