@@ -2,7 +2,7 @@
 // Moborr.io Home Screen
 // Emoji-Only Version - Frontend Auth
 // ===========================
-import { joinQueue, leaveQueue, isInQueue, getQueueStatus } from './game.js';
+
 import { 
   currentUser, 
   authToken, 
@@ -12,6 +12,8 @@ import {
   registerUser, 
   isLoggedIn 
 } from './auth.js';
+
+import { joinQueue, leaveQueue, isInQueue, getQueueStatus } from './game.js';
 
 function renderSidebar() {
   const profileName = isLoggedIn() ? currentUser.username : 'Login/Register';
@@ -56,8 +58,17 @@ function renderSidebar() {
 }
 
 function renderCenter() {
+  const queueStatus = getQueueStatus();
+  
   return `
     <main class="flex-1 flex flex-col items-center justify-center relative overflow-hidden">
+      ${queueStatus.isQueued ? `
+        <div class="fixed bottom-0 left-1/2 transform -translate-x-1/2 bg-purple-600 border-2 border-purple-400 text-white px-8 py-3 rounded-t-lg mb-0 text-center shadow-lg z-40">
+          <div class="text-sm font-bold">🎮 MATCH QUEUE</div>
+          <div id="queueTimer" class="text-lg font-black text-yellow-300">${queueStatus.formattedTime}</div>
+        </div>
+      ` : ''}
+      
       <div class="absolute inset-0 opacity-10 pointer-events-none">
         <div class="absolute top-0 left-0 w-96 h-96 bg-purple-500 rounded-full blur-3xl"></div>
         <div class="absolute bottom-0 right-0 w-96 h-96 bg-blue-500 rounded-full blur-3xl"></div>
@@ -71,7 +82,7 @@ function renderCenter() {
           <img src="./assets/logo.png" class="w-48 h-48 object-contain drop-shadow-lg" alt="Moborr Logo"/>
         </div>
         <button id="playBtn" class="bg-yellow-400 hover:bg-yellow-300 active:bg-yellow-500 text-black font-black rounded-full px-12 py-4 text-2xl shadow-lg transition transform hover:scale-105 mb-6">
-          ► PLAY NOW
+          ${isInQueue() ? '⏳ QUEUED' : '► PLAY NOW'}
         </button>
         <div class="flex justify-center gap-3 mb-6">
           <button class="center-btn bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded font-bold transition" data-modal="leaderboards">Leaderboards</button>
@@ -327,7 +338,24 @@ function setupEventListeners() {
 
   const playBtn = document.getElementById("playBtn");
   playBtn?.addEventListener("click", () => {
-    alert("🎮 Loading gameplay scene...\n(Main FPS game coming next!)");
+    if (isInQueue()) {
+      leaveQueue();
+      renderApp();
+    } else {
+      joinQueue();
+      renderApp();
+      
+      // Update queue timer every second
+      const queueInterval = setInterval(() => {
+        const timer = document.getElementById("queueTimer");
+        if (timer && isInQueue()) {
+          const status = getQueueStatus();
+          timer.textContent = status.formattedTime;
+        } else {
+          clearInterval(queueInterval);
+        }
+      }, 1000);
+    }
   });
 }
 
