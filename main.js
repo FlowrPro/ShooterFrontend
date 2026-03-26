@@ -1,25 +1,30 @@
 // ===========================
 // Moborr.io Home Screen
-// Emoji-Only Version - No Asset Files
+// Emoji-Only Version - Frontend Auth
 // ===========================
 
-const mockUser = {
-  nickname: "#PLAYER123",
-  level: 7,
-  avatar: "😎"
-};
-
-let currentModal = null;
+import { 
+  currentUser, 
+  authToken, 
+  loadUserFromStorage, 
+  logout, 
+  loginUser, 
+  registerUser, 
+  isLoggedIn 
+} from './auth.js';
 
 function renderSidebar() {
+  const profileName = isLoggedIn() ? currentUser.username : 'Login/Register';
+  const profileAvatar = isLoggedIn() ? currentUser.avatar : '🔐';
+
   return `
     <nav class="sidebar flex flex-col gap-4 bg-black bg-opacity-60 text-white w-44 p-4 min-h-screen shadow-xl border-r border-purple-500 border-opacity-30">
       <button class="nav-item-btn flex items-center mb-6 pb-4 border-b border-purple-400 border-opacity-30 w-full hover:bg-purple-600 hover:bg-opacity-50 rounded p-2 transition" data-modal="profile">
-  <div class="text-3xl mr-3">${mockUser.avatar}</div>
-  <div>
-    <div class="font-bold text-sm">${mockUser.nickname}</div>
-  </div>
-</button>
+        <div class="text-3xl mr-3">${profileAvatar}</div>
+        <div class="text-left">
+          <div class="font-bold text-sm">${profileName}</div>
+        </div>
+      </button>
       <button class="nav-item-btn active py-2 px-3 rounded flex items-center gap-2 hover:bg-purple-600 hover:bg-opacity-50 transition" data-modal="hub">
         🏠 <span>Hub</span>
       </button>
@@ -63,8 +68,8 @@ function renderCenter() {
         </div>
         <div class="text-purple-300 text-sm tracking-widest mb-6">BROWSER FPS • ALPHA</div>
         <div class="mb-6" title="Your hero character">
-  <img src="./assets/logo.png" class="w-48 h-48 object-contain drop-shadow-lg" alt="Moborr Logo"/>
-</div>
+          <img src="./assets/logo.png" class="w-48 h-48 object-contain drop-shadow-lg" alt="Moborr Logo"/>
+        </div>
         <button id="playBtn" class="bg-yellow-400 hover:bg-yellow-300 active:bg-yellow-500 text-black font-black rounded-full px-12 py-4 text-2xl shadow-lg transition transform hover:scale-105 mb-6">
           ► PLAY NOW
         </button>
@@ -127,7 +132,6 @@ function getModalContent(modalName) {
   const modalTitles = {
     hub: "HUB",
     store: "STORE",
-    profile: "PROFILE",
     servers: "SERVERS",
     quests: "QUESTS",
     friends: "FRIENDS",
@@ -137,28 +141,79 @@ function getModalContent(modalName) {
     leaderboards: "LEADERBOARDS",
     "create-game": "CREATE GAME",
     "join-game": "JOIN GAME",
-    "quick-match": "QUICK MATCH"
+    "quick-match": "QUICK MATCH",
+    profile: "PROFILE"
   };
 
+  // Profile Modal (Login/Register)
+  if (modalName === 'profile') {
+    if (isLoggedIn()) {
+      // Logged in view
+      return `
+        <div class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50" id="modalOverlay">
+          <div class="bg-gradient-to-br from-gray-900 to-gray-800 rounded-lg shadow-2xl border-2 border-purple-500 w-96 p-6 relative">
+            <button id="closeModal" class="absolute top-4 right-4 bg-red-600 hover:bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold text-lg">
+              ✕
+            </button>
+            <h2 class="text-center text-2xl font-black text-white mb-6 mt-2">PROFILE</h2>
+            
+            <div class="text-center">
+              <div class="text-6xl mb-4">${currentUser.avatar}</div>
+              <p class="text-xl font-bold text-white mb-4">${currentUser.username}</p>
+              <p class="text-gray-400 mb-6">User ID: ${currentUser.id}</p>
+              
+              <button id="logoutBtn" class="w-full bg-red-600 hover:bg-red-500 text-white px-6 py-2 rounded font-bold mb-4">
+                🚪 Logout
+              </button>
+              <button id="closeProfileBtn" class="w-full bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded font-bold">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    } else {
+      // Not logged in view - show login/register form
+      return `
+        <div class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50" id="modalOverlay">
+          <div class="bg-gradient-to-br from-gray-900 to-gray-800 rounded-lg shadow-2xl border-2 border-purple-500 w-96 p-6 relative">
+            <button id="closeModal" class="absolute top-4 right-4 bg-red-600 hover:bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold text-lg">
+              ✕
+            </button>
+            <h2 class="text-center text-2xl font-black text-white mb-6 mt-2">LOGIN / REGISTER</h2>
+            
+            <div class="space-y-4">
+              <input type="text" id="authUsername" placeholder="Username" class="w-full bg-gray-800 text-white px-4 py-2 rounded border border-purple-500 focus:outline-none focus:border-purple-300">
+              <input type="password" id="authPassword" placeholder="Password" class="w-full bg-gray-800 text-white px-4 py-2 rounded border border-purple-500 focus:outline-none focus:border-purple-300">
+              
+              <button id="loginBtn" class="w-full bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded font-bold">
+                🔓 Login
+              </button>
+              <button id="registerBtn" class="w-full bg-green-600 hover:bg-green-500 text-white px-6 py-2 rounded font-bold">
+                ✨ Register
+              </button>
+            </div>
+            
+            <div id="authMessage" class="mt-4 text-center text-sm text-yellow-300"></div>
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  // Default modal for other screens
   return `
     <div class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50" id="modalOverlay">
       <div class="bg-gradient-to-br from-gray-900 to-gray-800 rounded-lg shadow-2xl border-2 border-purple-500 w-96 p-6 relative">
-        <!-- Close Button -->
         <button id="closeModal" class="absolute top-4 right-4 bg-red-600 hover:bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold text-lg">
           ✕
         </button>
-
-        <!-- Modal Title -->
         <h2 class="text-center text-2xl font-black text-white mb-6 mt-2">
           ${modalTitles[modalName] || modalName.toUpperCase()}
         </h2>
-
-        <!-- Modal Content -->
         <div class="text-white text-center">
           <p class="text-gray-300 mb-6">Content for ${modalTitles[modalName] || modalName.toUpperCase()} coming soon...</p>
         </div>
-
-        <!-- Footer Button -->
         <div class="mt-6 flex justify-center">
           <button id="closeModalBtn" class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded font-bold">
             Close
@@ -170,24 +225,82 @@ function getModalContent(modalName) {
 }
 
 function openModal(modalName) {
-  // Remove existing modal if any
   const existingModal = document.getElementById("modalOverlay");
   if (existingModal) {
     existingModal.remove();
   }
 
-  // Create and insert new modal
   const modalHTML = getModalContent(modalName);
   document.body.insertAdjacentHTML("beforeend", modalHTML);
 
-  // Setup close button listeners
-  document.getElementById("closeModal").addEventListener("click", closeModal);
-  document.getElementById("closeModalBtn").addEventListener("click", closeModal);
-  document.getElementById("modalOverlay").addEventListener("click", (e) => {
+  // Close button handlers
+  document.getElementById("closeModal")?.addEventListener("click", closeModal);
+  document.getElementById("closeModalBtn")?.addEventListener("click", closeModal);
+  document.getElementById("closeProfileBtn")?.addEventListener("click", closeModal);
+  document.getElementById("modalOverlay")?.addEventListener("click", (e) => {
     if (e.target.id === "modalOverlay") {
       closeModal();
     }
   });
+
+  // Auth handlers (if profile modal)
+  if (modalName === 'profile' && !isLoggedIn()) {
+    document.getElementById("loginBtn")?.addEventListener("click", async () => {
+      const username = document.getElementById("authUsername").value;
+      const password = document.getElementById("authPassword").value;
+      const message = document.getElementById("authMessage");
+
+      if (!username || !password) {
+        message.textContent = "❌ Please fill in all fields";
+        return;
+      }
+
+      message.textContent = "🔄 Logging in...";
+      const result = await loginUser(username, password);
+      
+      if (result.success) {
+        renderApp();
+        closeModal();
+      } else {
+        message.textContent = `❌ ${result.error}`;
+      }
+    });
+
+    document.getElementById("registerBtn")?.addEventListener("click", async () => {
+      const username = document.getElementById("authUsername").value;
+      const password = document.getElementById("authPassword").value;
+      const message = document.getElementById("authMessage");
+
+      if (!username || !password) {
+        message.textContent = "❌ Please fill in all fields";
+        return;
+      }
+
+      if (password.length < 6) {
+        message.textContent = "❌ Password must be at least 6 characters";
+        return;
+      }
+
+      message.textContent = "🔄 Registering...";
+      const result = await registerUser(username, password);
+      
+      if (result.success) {
+        renderApp();
+        closeModal();
+      } else {
+        message.textContent = `❌ ${result.error}`;
+      }
+    });
+  }
+
+  // Logout handler
+  if (modalName === 'profile' && isLoggedIn()) {
+    document.getElementById("logoutBtn")?.addEventListener("click", () => {
+      logout();
+      renderApp();
+      closeModal();
+    });
+  }
 }
 
 function closeModal() {
@@ -198,7 +311,6 @@ function closeModal() {
 }
 
 function setupEventListeners() {
-  // Sidebar nav items
   document.querySelectorAll(".nav-item-btn").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       const modalName = e.currentTarget.getAttribute("data-modal");
@@ -206,7 +318,6 @@ function setupEventListeners() {
     });
   });
 
-  // Center buttons
   document.querySelectorAll(".center-btn").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       const modalName = e.currentTarget.getAttribute("data-modal");
@@ -214,7 +325,6 @@ function setupEventListeners() {
     });
   });
 
-  // Play button
   const playBtn = document.getElementById("playBtn");
   playBtn?.addEventListener("click", () => {
     alert("🎮 Loading gameplay scene...\n(Main FPS game coming next!)");
@@ -228,6 +338,9 @@ function renderApp() {
     setupEventListeners();
   }
 }
+
+// Initialize
+loadUserFromStorage();
 
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", renderApp);
