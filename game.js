@@ -3,8 +3,123 @@
 // Three.js FPS Implementation
 // ===========================
 
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@r128/build/three.module.js';
-import { PointerLockControls } from 'https://cdn.jsdelivr.net/npm/three@r128/examples/jsm/controls/PointerLockControls.js';
+import * as THREE from 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+
+const PointerLockControls = (function() {
+  class PointerLockControls {
+    constructor(camera, domElement) {
+      this.camera = camera;
+      this.domElement = domElement;
+      this.isLocked = false;
+
+      const euler = new THREE.Euler(0, 0, 0, 'YXZ');
+      const PI_2 = Math.PI / 2;
+
+      const changeEvent = { type: 'change' };
+      const lockEvent = { type: 'lock' };
+      const unlockEvent = { type: 'unlock' };
+
+      const onMouseMove = (event) => {
+        if (!this.isLocked) return;
+
+        const movementX = event.movementX || event.mozMovementX || event.webkitMovementX || 0;
+        const movementY = event.movementY || event.mozMovementY || event.webkitMovementY || 0;
+
+        euler.setFromQuaternion(camera.quaternion);
+        euler.rotateY(-movementX * 0.002);
+        euler.rotateX(-movementY * 0.002);
+        euler.x = Math.max(-PI_2, Math.min(PI_2, euler.x));
+        camera.quaternion.setFromEuler(euler);
+
+        this.dispatchEvent(changeEvent);
+      };
+
+      const onPointerlockChange = () => {
+        if (document.pointerLockElement === domElement) {
+          this.isLocked = true;
+          this.dispatchEvent(lockEvent);
+        } else {
+          this.isLocked = false;
+          this.dispatchEvent(unlockEvent);
+        }
+      };
+
+      const onPointerlockError = () => {
+        console.error('PointerLock error');
+      };
+
+      this.connect = function() {
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('pointerlockchange', onPointerlockChange);
+        document.addEventListener('pointerlockerror', onPointerlockError);
+      };
+
+      this.disconnect = function() {
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('pointerlockchange', onPointerlockChange);
+        document.removeEventListener('pointerlockerror', onPointerlockError);
+      };
+
+      this.dispose = function() {
+        this.disconnect();
+      };
+
+      this.getObject = function() {
+        return camera;
+      };
+
+      this.lock = function() {
+        domElement.requestPointerLock = domElement.requestPointerLock || domElement.mozRequestPointerLock || domElement.webkitRequestPointerLock;
+        if (domElement.requestPointerLock) {
+          domElement.requestPointerLock();
+        }
+      };
+
+      this.unlock = function() {
+        document.exitPointerLock = document.exitPointerLock || document.mozExitPointerLock || document.webkitExitPointerLock;
+        if (document.exitPointerLock) {
+          document.exitPointerLock();
+        }
+      };
+
+      this.connect();
+
+      this._listeners = {};
+    }
+
+    addEventListener(type, listener) {
+      if (!this._listeners[type]) this._listeners[type] = [];
+      this._listeners[type].push(listener);
+    }
+
+    removeEventListener(type, listener) {
+      if (this._listeners[type]) {
+        const index = this._listeners[type].indexOf(listener);
+        if (index > -1) this._listeners[type].splice(index, 1);
+      }
+    }
+
+    dispatchEvent(event) {
+      if (this._listeners[event.type]) {
+        this._listeners[event.type].forEach(listener => listener(event));
+      }
+    }
+
+    moveForward(distance) {
+      const direction = new THREE.Vector3(0, 0, -1);
+      direction.applyQuaternion(this.camera.quaternion);
+      this.camera.position.addScaledVector(direction, distance);
+    }
+
+    moveRight(distance) {
+      const direction = new THREE.Vector3(1, 0, 0);
+      direction.applyQuaternion(this.camera.quaternion);
+      this.camera.position.addScaledVector(direction, distance);
+    }
+  }
+
+  return PointerLockControls;
+})();
 
 const BACKEND_URL = 'https://moborr-backend.onrender.com';
 
