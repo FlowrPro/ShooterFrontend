@@ -327,7 +327,8 @@ function setupEventListeners() {
 
   const playBtn = document.getElementById("playBtn");
   playBtn?.addEventListener("click", () => {
-    alert("🎮 Loading gameplay scene...\n(Main FPS game coming next!)");
+    // Navigate to game page
+    window.location.href = './game.html';
   });
 }
 
