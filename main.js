@@ -13,9 +13,6 @@ import {
   isLoggedIn 
 } from './auth.js';
 
-import { joinQueue, leaveQueue, isInQueue, getQueueStatus } from './queue.js';
-import { startGame, leaveGame, isInGame } from './game.js';
-
 function renderSidebar() {
   const profileName = isLoggedIn() ? currentUser.username : 'Login/Register';
   const profileAvatar = isLoggedIn() ? currentUser.avatar : '🔐';
@@ -23,11 +20,11 @@ function renderSidebar() {
   return `
     <nav class="sidebar flex flex-col gap-4 bg-black bg-opacity-60 text-white w-44 p-4 min-h-screen shadow-xl border-r border-purple-500 border-opacity-30">
       <button class="nav-item-btn flex items-center mb-6 pb-4 border-b border-purple-400 border-opacity-30 w-full hover:bg-purple-600 hover:bg-opacity-50 rounded p-2 transition overflow-hidden" data-modal="profile">
-        <div class="text-3xl mr-2 flex-shrink-0">${profileAvatar}</div>
-        <div class="text-left min-w-0">
-          <div class="font-bold text-sm truncate">${profileName}</div>
-        </div>
-      </button>
+  <div class="text-3xl mr-2 flex-shrink-0">${profileAvatar}</div>
+  <div class="text-left min-w-0">
+    <div class="font-bold text-sm truncate">${profileName}</div>
+  </div>
+</button>
       <button class="nav-item-btn active py-2 px-3 rounded flex items-center gap-2 hover:bg-purple-600 hover:bg-opacity-50 transition" data-modal="hub">
         🏠 <span>Hub</span>
       </button>
@@ -59,17 +56,8 @@ function renderSidebar() {
 }
 
 function renderCenter() {
-  const queueStatus = getQueueStatus();
-  
   return `
     <main class="flex-1 flex flex-col items-center justify-center relative overflow-hidden">
-      ${queueStatus.isQueued ? `
-        <div class="fixed bottom-0 left-1/2 transform -translate-x-1/2 bg-purple-600 border-2 border-purple-400 text-white px-8 py-3 rounded-t-lg mb-0 text-center shadow-lg z-40">
-          <div class="text-sm font-bold">🎮 MATCH QUEUE</div>
-          <div id="queueTimer" class="text-lg font-black text-yellow-300">${queueStatus.formattedTime}</div>
-        </div>
-      ` : ''}
-      
       <div class="absolute inset-0 opacity-10 pointer-events-none">
         <div class="absolute top-0 left-0 w-96 h-96 bg-purple-500 rounded-full blur-3xl"></div>
         <div class="absolute bottom-0 right-0 w-96 h-96 bg-blue-500 rounded-full blur-3xl"></div>
@@ -83,7 +71,7 @@ function renderCenter() {
           <img src="./assets/logo.png" class="w-48 h-48 object-contain drop-shadow-lg" alt="Moborr Logo"/>
         </div>
         <button id="playBtn" class="bg-yellow-400 hover:bg-yellow-300 active:bg-yellow-500 text-black font-black rounded-full px-12 py-4 text-2xl shadow-lg transition transform hover:scale-105 mb-6">
-          ${isInGame() ? '🎮 IN GAME' : '► PLAY NOW'}
+          ► PLAY NOW
         </button>
         <div class="flex justify-center gap-3 mb-6">
           <button class="center-btn bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded font-bold transition" data-modal="leaderboards">Leaderboards</button>
@@ -124,10 +112,10 @@ function renderRightPanel() {
       <div>
         <div class="font-bold mb-2 text-sm">🌍 Region</div>
         <div class="bg-gray-800 bg-opacity-50 rounded p-2">
-          <select id="regionSelect" class="w-full bg-gray-900 text-white px-2 py-1 rounded text-sm">
-            <option value="north-america">🌍 North America</option>
-            <option value="europe">🌍 Europe</option>
-            <option value="asia">🌍 Asia</option>
+          <select class="w-full bg-gray-900 text-white px-2 py-1 rounded text-sm">
+            <option>🌍 North America</option>
+            <option>🌍 Europe</option>
+            <option>🌍 Asia</option>
           </select>
         </div>
       </div>
@@ -338,28 +326,8 @@ function setupEventListeners() {
   });
 
   const playBtn = document.getElementById("playBtn");
-  playBtn?.addEventListener("click", async () => {
-    if (!isLoggedIn()) {
-      alert("❌ Please login first!");
-      return;
-    }
-
-    if (isInGame()) {
-      leaveGame();
-      return;
-    }
-
-    // Get selected region
-    const regionSelect = document.getElementById("regionSelect");
-    const region = regionSelect ? regionSelect.value : 'north-america';
-
-    // Start the game
-    try {
-      await startGame(authToken, region);
-    } catch (error) {
-      console.error('Failed to start game:', error);
-      alert('❌ Failed to start game. Please try again.');
-    }
+  playBtn?.addEventListener("click", () => {
+    alert("🎮 Loading gameplay scene...\n(Main FPS game coming next!)");
   });
 }
 
