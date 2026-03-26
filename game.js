@@ -130,10 +130,21 @@ class FPSGame {
     this.localPlayer = null;
     this.remotePlayers = new Map();
     this.bullets = [];
+    this.bulletTracers = [];
     this.gameTime = 0;
     this.matchDuration = 5 * 60; // 5 minutes in seconds
     this.isRunning = false;
     this.lastTimerUpdate = 0;
+
+    // Player physics
+    this.playerHeight = 1.6;
+    this.crouchHeight = 1.0;
+    this.currentHeight = this.playerHeight;
+    this.velocity = { x: 0, y: 0, z: 0 };
+    this.isJumping = false;
+    this.gravity = 9.8;
+    this.jumpForce = 8;
+    this.groundLevel = 0;
 
     // Input state
     this.input = {
@@ -144,7 +155,8 @@ class FPSGame {
       jump: false,
       crouch: false,
       shoot: false,
-      scope: false
+      scope: false,
+      reload: false
     };
 
     // Weapon state
@@ -155,7 +167,10 @@ class FPSGame {
       fireRate: 100, // ms between shots
       damage: 20,
       lastShotTime: 0,
-      isScoped: false
+      isScoped: false,
+      isReloading: false,
+      reloadTime: 0,
+      reloadDuration: 1.5 // seconds
     };
 
     this.setupScene();
@@ -172,7 +187,7 @@ class FPSGame {
 
     // Camera setup
     this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    this.camera.position.set(0, 1.6, 0);
+    this.camera.position.set(0, this.playerHeight, 0);
 
     // Renderer setup
     this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true });
@@ -260,6 +275,7 @@ class FPSGame {
       e.preventDefault();
     }
     if (key === 'shift') this.input.crouch = true;
+    if (key === 'r') this.input.reload = true;
   }
 
   handleKeyUp(e) {
@@ -270,6 +286,7 @@ class FPSGame {
     if (key === 'd') this.input.right = false;
     if (key === ' ') this.input.jump = false;
     if (key === 'shift') this.input.crouch = false;
+    if (key === 'r') this.input.reload = false;
   }
 
   handleMouseDown(e) {
@@ -330,6 +347,7 @@ class FPSGame {
     hudTop.innerHTML = `
       <div style="font-size: 14px; margin-bottom: 5px;">ASSAULT RIFLE</div>
       <div id="ammoDisplay" style="font-size: 18px; font-weight: bold;">AMMO: 30/30</div>
+      <div id="reloadDisplay" style="font-size: 12px; color: #ffff00; margin-top: 5px;"></div>
     `;
     uiContainer.appendChild(hudTop);
 
@@ -411,7 +429,7 @@ class FPSGame {
       font-size: 12px;
       pointer-events: none;
     `;
-    escapeHint.textContent = 'Press ESC to exit game';
+    escapeHint.textContent = 'Press ESC to exit | WASD Move | SPACE Jump | SHIFT Crouch | R Reload';
     uiContainer.appendChild(escapeHint);
 
     document.body.appendChild(uiContainer);
@@ -433,6 +451,17 @@ class FPSGame {
         ammoDisplay.style.color = '#ff0000';
       } else {
         ammoDisplay.style.color = '#00ff00';
+      }
+    }
+
+    // Update reload display
+    const reloadDisplay = document.getElementById('reloadDisplay');
+    if (reloadDisplay) {
+      if (this.weapon.isReloading) {
+        const reloadPercent = (this.weapon.reloadTime / this.weapon.reloadDuration) * 100;
+        reloadDisplay.textContent = `RELOADING... ${Math.floor(reloadPercent)}%`;
+      } else {
+        reloadDisplay.textContent = '';
       }
     }
 
@@ -474,11 +503,27 @@ class FPSGame {
       return;
     }
 
-    // Update player movement
+    // Update reload
+    if (this.weapon.isReloading) {
+      this.weapon.reloadTime += deltaTime;
+      if (this.weapon.reloadTime >= this.weapon.reloadDuration) {
+        this.weapon.isReloading = false;
+        this.weapon.reloadTime = 0;
+        this.weapon.ammo = this.weapon.maxAmmo;
+      }
+    }
+
+    // Handle reload input
+    if (this.input.reload && !this.weapon.isReloading && this.weapon.ammo < this.weapon.maxAmmo) {
+      this.weapon.isReloading = true;
+      this.weapon.reloadTime = 0;
+    }
+
+    // Update player movement and physics
     this.updateMovement(deltaTime);
 
     // Handle shooting
-    if (this.input.shoot && document.pointerLockElement) {
+    if (this.input.shoot && document.pointerLockElement && !this.weapon.isReloading) {
       this.fire();
     }
 
@@ -495,7 +540,7 @@ class FPSGame {
     // Update UI
     this.updateUI();
 
-    // Update bullets (visual only, server handles hit detection)
+    // Update bullets
     this.updateBullets(deltaTime);
 
     // Send position to server periodically
@@ -519,14 +564,39 @@ class FPSGame {
       this.controls.moveForward(direction.z * speed * deltaTime);
     }
 
-    if (this.input.jump) {
-      this.camera.position.y += 0.15;
-      this.input.jump = false;
+    // Handle jumping
+    if (this.input.jump && !this.isJumping) {
+      this.velocity.y = this.jumpForce;
+      this.isJumping = true;
     }
 
-    // Gravity
-    if (this.camera.position.y > 1.6) {
-      this.camera.position.y -= 0.1;
+    // Apply gravity
+    this.velocity.y -= this.gravity * deltaTime;
+
+    // Update vertical position
+    this.camera.position.y += this.velocity.y * deltaTime;
+
+    // Check if on ground
+    if (this.camera.position.y <= this.groundLevel + this.currentHeight) {
+      this.camera.position.y = this.groundLevel + this.currentHeight;
+      this.velocity.y = 0;
+      this.isJumping = false;
+    }
+
+    // Handle crouching
+    if (this.input.crouch) {
+      this.currentHeight = this.crouchHeight;
+    } else {
+      this.currentHeight = this.playerHeight;
+    }
+
+    // Smooth camera height transition
+    const targetY = this.groundLevel + this.currentHeight;
+    const currentY = this.camera.position.y;
+    if (Math.abs(currentY - targetY) > 0.01) {
+      this.camera.position.y += (targetY - currentY) * 0.1;
+    } else {
+      this.camera.position.y = targetY;
     }
 
     // Update local player state
@@ -557,7 +627,7 @@ class FPSGame {
     this.weapon.lastShotTime = now;
 
     // Get ray from camera
-    const rayOrigin = this.camera.position;
+    const rayOrigin = this.camera.position.clone();
     const rayDirection = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
 
     // Create bullet visual
@@ -571,23 +641,49 @@ class FPSGame {
     const length = 100;
     const endPoint = new THREE.Vector3().copy(direction).multiplyScalar(length).add(origin);
 
+    // Create a line for the bullet tracer
     const geometry = new THREE.BufferGeometry().setFromPoints([origin, endPoint]);
-    const material = new THREE.LineBasicMaterial({ color: 0xffff00, linewidth: 2 });
+    const material = new THREE.LineBasicMaterial({ 
+      color: 0xffff00,
+      linewidth: 3,
+      transparent: true,
+      opacity: 0.8
+    });
     const line = new THREE.Line(geometry, material);
     this.scene.add(line);
 
-    this.bullets.push({
-      object: line,
+    // Create a glowing sphere at the end point
+    const sphereGeometry = new THREE.SphereGeometry(0.2, 8, 8);
+    const sphereMaterial = new THREE.MeshBasicMaterial({ 
+      color: 0xffff00,
+      emissive: 0xffff00
+    });
+    const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+    sphere.position.copy(endPoint);
+    this.scene.add(sphere);
+
+    this.bulletTracers.push({
+      line: line,
+      sphere: sphere,
       createdAt: Date.now()
     });
   }
 
   updateBullets(deltaTime) {
     const now = Date.now();
-    for (let i = this.bullets.length - 1; i >= 0; i--) {
-      if (now - this.bullets[i].createdAt > 200) {
-        this.scene.remove(this.bullets[i].object);
-        this.bullets.splice(i, 1);
+    for (let i = this.bulletTracers.length - 1; i >= 0; i--) {
+      const tracer = this.bulletTracers[i];
+      const age = now - tracer.createdAt;
+
+      if (age > 150) {
+        this.scene.remove(tracer.line);
+        this.scene.remove(tracer.sphere);
+        this.bulletTracers.splice(i, 1);
+      } else {
+        // Fade out tracer
+        const fadeProgress = age / 150;
+        tracer.line.material.opacity = 0.8 * (1 - fadeProgress);
+        tracer.sphere.material.opacity = 1 - fadeProgress;
       }
     }
   }
@@ -757,7 +853,7 @@ export async function startGame(token, region = 'north-america') {
       hp: 100,
       kills: 0,
       deaths: 0,
-      position: new THREE.Vector3(0, 1.6, 0),
+      position: new THREE.Vector3(0, game.playerHeight, 0),
       rotation: { x: 0, y: 0 }
     };
 
