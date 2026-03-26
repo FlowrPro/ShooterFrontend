@@ -2,7 +2,7 @@
 // Moborr.io Home Screen
 // Emoji-Only Version - Frontend Auth
 // ===========================
-
+import { joinQueue, leaveQueue, isInQueue, getQueueStatus } from './game.js';
 import { 
   currentUser, 
   authToken, 
