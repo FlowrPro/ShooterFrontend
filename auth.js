@@ -2,7 +2,16 @@
 // Moborr.io Authentication Module
 // ===========================
 
-const BACKEND_URL = window.location.origin; // Auto-detects Render URL or localhost
+// Determine backend URL based on environment
+let BACKEND_URL;
+
+if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+  // Local development
+  BACKEND_URL = 'http://localhost:3000';
+} else {
+  // Production: use Render backend
+  BACKEND_URL = 'https://moborr-backend.onrender.com';
+}
 
 export let currentUser = null;
 export let authToken = null;
@@ -84,3 +93,5 @@ export async function registerUser(username, password) {
 export function isLoggedIn() {
   return currentUser !== null && authToken !== null;
 }
+
+export { BACKEND_URL };
