@@ -13,6 +13,14 @@ const GAME_CONFIG = {
   GRASS_TILE_SIZE: 50
 };
 
+const MINIMAP_CONFIG = {
+  WIDTH: 200,
+  HEIGHT: 200,
+  X: 10,
+  Y: 10,
+  SCALE: 0.004 // Ratio of minimap pixels to map pixels
+};
+
 let gameState = {
   localPlayer: null,
   otherPlayers: new Map(),
@@ -148,6 +156,52 @@ function drawPlayer(player, isLocal = false) {
   }
 }
 
+function drawMinimap() {
+  const minimapX = GAME_CONFIG.CANVAS_WIDTH - MINIMAP_CONFIG.WIDTH - 10;
+  const minimapY = 10;
+
+  // Background
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+  ctx.fillRect(minimapX, minimapY, MINIMAP_CONFIG.WIDTH, MINIMAP_CONFIG.HEIGHT);
+
+  // Border
+  ctx.strokeStyle = '#22c55e';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(minimapX, minimapY, MINIMAP_CONFIG.WIDTH, MINIMAP_CONFIG.HEIGHT);
+
+  // Draw viewport indicator (where player is looking)
+  const viewportX = minimapX + (gameState.camera.x / GAME_CONFIG.MAP_WIDTH) * MINIMAP_CONFIG.WIDTH;
+  const viewportY = minimapY + (gameState.camera.y / GAME_CONFIG.MAP_HEIGHT) * MINIMAP_CONFIG.HEIGHT;
+  const viewportW = (GAME_CONFIG.CANVAS_WIDTH / GAME_CONFIG.MAP_WIDTH) * MINIMAP_CONFIG.WIDTH;
+  const viewportH = (GAME_CONFIG.CANVAS_HEIGHT / GAME_CONFIG.MAP_HEIGHT) * MINIMAP_CONFIG.HEIGHT;
+
+  ctx.strokeStyle = 'rgba(34, 197, 94, 0.3)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(viewportX, viewportY, viewportW, viewportH);
+
+  // Draw local player
+  if (gameState.localPlayer) {
+    const localX = minimapX + (gameState.localPlayer.x / GAME_CONFIG.MAP_WIDTH) * MINIMAP_CONFIG.WIDTH;
+    const localY = minimapY + (gameState.localPlayer.y / GAME_CONFIG.MAP_HEIGHT) * MINIMAP_CONFIG.HEIGHT;
+
+    ctx.fillStyle = '#22c55e';
+    ctx.beginPath();
+    ctx.arc(localX, localY, 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Draw other players
+  gameState.otherPlayers.forEach((player) => {
+    const playerX = minimapX + (player.x / GAME_CONFIG.MAP_WIDTH) * MINIMAP_CONFIG.WIDTH;
+    const playerY = minimapY + (player.y / GAME_CONFIG.MAP_HEIGHT) * MINIMAP_CONFIG.HEIGHT;
+
+    ctx.fillStyle = '#16a34a';
+    ctx.beginPath();
+    ctx.arc(playerX, playerY, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
+
 function updateCamera() {
   if (!gameState.localPlayer) return;
 
@@ -190,16 +244,8 @@ function gameLoop() {
     drawPlayer(player, false);
   });
 
-  // HUD
-  ctx.fillStyle = '#ffffff';
-  ctx.font = '12px Arial';
-  ctx.textAlign = 'left';
-  if (gameState.localPlayer) {
-    ctx.fillText(`Character: ${gameState.localPlayer.characterName}`, 10, 20);
-    ctx.fillText(`Position: ${gameState.localPlayer.x.toFixed(0)}, ${gameState.localPlayer.y.toFixed(0)}`, 10, 35);
-  }
-  ctx.fillText(`Players: ${gameState.otherPlayers.size + (gameState.localPlayer ? 1 : 0)}`, 10, 50);
-  ctx.fillText(`WS: ${gameState.ws?.readyState === WebSocket.OPEN ? '🟢' : '🔴'}`, 10, 65);
+  // Draw minimap
+  drawMinimap();
 
   requestAnimationFrame(gameLoop);
 }
