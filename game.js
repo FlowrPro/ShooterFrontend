@@ -31,10 +31,12 @@ let gameState = {
   lastInputTime: 0,
   inputDelay: 50,
   selectedCharacter: null,
-  velocity: { x: 0, y: 0 }, // Smooth movement velocity
-  targetVelocity: { x: 0, y: 0 }, // Target velocity based on input
-  acceleration: 0.5, // How quickly we reach target velocity
-  friction: 0.92 // Smoothing factor
+  velocity: { x: 0, y: 0 },
+  targetVelocity: { x: 0, y: 0 },
+  acceleration: 0.15,
+  maxSpeed: 3,
+  friction: 0.88,
+  playerTexture: null
 };
 
 const canvas = document.getElementById('gameCanvas');
@@ -45,6 +47,22 @@ function resizeCanvas() {
   canvas.height = window.innerHeight;
   GAME_CONFIG.CANVAS_WIDTH = canvas.width;
   GAME_CONFIG.CANVAS_HEIGHT = canvas.height;
+}
+
+// Load player texture
+function loadPlayerTexture() {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      gameState.playerTexture = img;
+      resolve(img);
+    };
+    img.onerror = () => {
+      console.warn('Failed to load defaultplayer.png, will use fallback rendering');
+      resolve(null);
+    };
+    img.src = './assets/defaultplayer.png';
+  });
 }
 
 // Procedural grass texture using seeded random
@@ -115,39 +133,53 @@ function drawPlayer(player, isLocal = false) {
   const screenX = player.x - gameState.camera.x;
   const screenY = player.y - gameState.camera.y;
 
-  if (screenX < -GAME_CONFIG.PLAYER_RADIUS * 2 || screenX > GAME_CONFIG.CANVAS_WIDTH + GAME_CONFIG.PLAYER_RADIUS * 2 ||
-      screenY < -GAME_CONFIG.PLAYER_RADIUS * 2 || screenY > GAME_CONFIG.CANVAS_HEIGHT + GAME_CONFIG.PLAYER_RADIUS * 2) {
+  if (screenX < -GAME_CONFIG.PLAYER_RADIUS * 3 || screenX > GAME_CONFIG.CANVAS_WIDTH + GAME_CONFIG.PLAYER_RADIUS * 3 ||
+      screenY < -GAME_CONFIG.PLAYER_RADIUS * 3 || screenY > GAME_CONFIG.CANVAS_HEIGHT + GAME_CONFIG.PLAYER_RADIUS * 3) {
     return;
   }
 
-  // Player body
-  ctx.fillStyle = isLocal ? '#22c55e' : '#16a34a';
-  ctx.beginPath();
-  ctx.arc(screenX, screenY, GAME_CONFIG.PLAYER_RADIUS, 0, Math.PI * 2);
-  ctx.fill();
+  // Draw player texture or fallback
+  if (gameState.playerTexture) {
+    ctx.save();
+    ctx.globalAlpha = 1.0;
+    ctx.drawImage(
+      gameState.playerTexture,
+      screenX - GAME_CONFIG.PLAYER_RADIUS,
+      screenY - GAME_CONFIG.PLAYER_RADIUS,
+      GAME_CONFIG.PLAYER_RADIUS * 2,
+      GAME_CONFIG.PLAYER_RADIUS * 2
+    );
+    ctx.restore();
+  } else {
+    // Fallback: draw green circle if texture not loaded
+    ctx.fillStyle = isLocal ? '#22c55e' : '#16a34a';
+    ctx.beginPath();
+    ctx.arc(screenX, screenY, GAME_CONFIG.PLAYER_RADIUS, 0, Math.PI * 2);
+    ctx.fill();
 
-  ctx.strokeStyle = '#15803d';
-  ctx.lineWidth = 2;
-  ctx.stroke();
+    ctx.strokeStyle = '#15803d';
+    ctx.lineWidth = 2;
+    ctx.stroke();
 
-  // Eyes
-  ctx.fillStyle = '#ffffff';
-  ctx.beginPath();
-  ctx.arc(screenX - 8, screenY - 5, 4, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#000000';
-  ctx.beginPath();
-  ctx.arc(screenX - 8, screenY - 5, 2, 0, Math.PI * 2);
-  ctx.fill();
+    // Eyes
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(screenX - 8, screenY - 5, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#000000';
+    ctx.beginPath();
+    ctx.arc(screenX - 8, screenY - 5, 2, 0, Math.PI * 2);
+    ctx.fill();
 
-  ctx.fillStyle = '#ffffff';
-  ctx.beginPath();
-  ctx.arc(screenX + 8, screenY - 5, 4, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = '#000000';
-  ctx.beginPath();
-  ctx.arc(screenX + 8, screenY - 5, 2, 0, Math.PI * 2);
-  ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(screenX + 8, screenY - 5, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#000000';
+    ctx.beginPath();
+    ctx.arc(screenX + 8, screenY - 5, 2, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
   // Character name label
   ctx.fillStyle = '#ffffff';
@@ -170,9 +202,6 @@ function drawMinimap() {
   const minimapY = 10;
 
   // Draw minimap terrain
-  const minimapStartX = Math.floor((minimapX * GAME_CONFIG.MAP_WIDTH / GAME_CONFIG.CANVAS_WIDTH) / (MINIMAP_CONFIG.GRASS_TILE_SIZE / MINIMAP_CONFIG.SCALE));
-  const minimapStartY = Math.floor((minimapY * GAME_CONFIG.MAP_HEIGHT / GAME_CONFIG.CANVAS_HEIGHT) / (MINIMAP_CONFIG.GRASS_TILE_SIZE / MINIMAP_CONFIG.SCALE));
-
   for (let px = 0; px < MINIMAP_CONFIG.WIDTH; px += MINIMAP_CONFIG.GRASS_TILE_SIZE) {
     for (let py = 0; py < MINIMAP_CONFIG.HEIGHT; py += MINIMAP_CONFIG.GRASS_TILE_SIZE) {
       const worldX = (px / MINIMAP_CONFIG.WIDTH) * GAME_CONFIG.MAP_WIDTH;
@@ -235,22 +264,28 @@ function updateCamera() {
 function updateLocalPlayerMovement() {
   if (!gameState.localPlayer) return;
 
-  // Calculate target velocity based on input (slower speed)
-  const speed = 3; // Reduced from 7 to 3
+  // Calculate target velocity based on input
   gameState.targetVelocity.x = 0;
   gameState.targetVelocity.y = 0;
 
   if (gameState.keys['w'] || gameState.keys['W']) {
-    gameState.targetVelocity.y -= speed;
+    gameState.targetVelocity.y -= gameState.maxSpeed;
   }
   if (gameState.keys['s'] || gameState.keys['S']) {
-    gameState.targetVelocity.y += speed;
+    gameState.targetVelocity.y += gameState.maxSpeed;
   }
   if (gameState.keys['a'] || gameState.keys['A']) {
-    gameState.targetVelocity.x -= speed;
+    gameState.targetVelocity.x -= gameState.maxSpeed;
   }
   if (gameState.keys['d'] || gameState.keys['D']) {
-    gameState.targetVelocity.x += speed;
+    gameState.targetVelocity.x += gameState.maxSpeed;
+  }
+
+  // Normalize diagonal movement to prevent speedup
+  const targetMagnitude = Math.sqrt(gameState.targetVelocity.x ** 2 + gameState.targetVelocity.y ** 2);
+  if (targetMagnitude > gameState.maxSpeed) {
+    gameState.targetVelocity.x = (gameState.targetVelocity.x / targetMagnitude) * gameState.maxSpeed;
+    gameState.targetVelocity.y = (gameState.targetVelocity.y / targetMagnitude) * gameState.maxSpeed;
   }
 
   // Smoothly interpolate velocity toward target
@@ -419,7 +454,7 @@ function connectWebSocket() {
   };
 }
 
-export function initializeGame() {
+export async function initializeGame() {
   const selectedChar = localStorage.getItem('moborr_selected_character');
   if (!selectedChar) {
     window.location.href = './index.html';
@@ -427,6 +462,9 @@ export function initializeGame() {
   }
 
   gameState.selectedCharacter = JSON.parse(selectedChar);
+
+  // Load player texture before starting game
+  await loadPlayerTexture();
 
   resizeCanvas();
   setupKeyboardInput();
