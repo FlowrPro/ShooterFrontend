@@ -10,7 +10,8 @@ import {
   logout, 
   loginUser, 
   registerUser, 
-  isLoggedIn 
+  isLoggedIn,
+  BACKEND_URL
 } from './auth.js';
 
 function renderSidebar() {
@@ -295,7 +296,7 @@ function openCharacterNameModal(slot, currentName = '') {
     message.textContent = '🔄 Saving...';
 
     try {
-      const res = await fetch(`${window.location.origin}/characters`, {
+      const res = await fetch(`${BACKEND_URL}/characters`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -347,7 +348,7 @@ async function loadCharacterSlots() {
   }
 
   try {
-    const res = await fetch(`${window.location.origin}/characters`, {
+    const res = await fetch(`${BACKEND_URL}/characters`, {
       headers: { 'Authorization': `Bearer ${authToken}` }
     });
     if (!res.ok) {
