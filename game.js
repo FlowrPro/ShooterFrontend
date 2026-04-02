@@ -18,7 +18,8 @@ const MINIMAP_CONFIG = {
   HEIGHT: 200,
   X: 10,
   Y: 10,
-  SCALE: 0.004 // Ratio of minimap pixels to map pixels
+  SCALE: 0.004,
+  GRASS_TILE_SIZE: 2 // Minimap tiles
 };
 
 let gameState = {
@@ -29,7 +30,11 @@ let gameState = {
   ws: null,
   lastInputTime: 0,
   inputDelay: 50,
-  selectedCharacter: null
+  selectedCharacter: null,
+  velocity: { x: 0, y: 0 }, // Smooth movement velocity
+  targetVelocity: { x: 0, y: 0 }, // Target velocity based on input
+  acceleration: 0.5, // How quickly we reach target velocity
+  friction: 0.92 // Smoothing factor
 };
 
 const canvas = document.getElementById('gameCanvas');
@@ -48,33 +53,37 @@ function seededRandom(seed) {
   return x - Math.floor(x);
 }
 
+function getTerrainColor(x, y) {
+  const tileX = x / GAME_CONFIG.GRASS_TILE_SIZE;
+  const tileY = y / GAME_CONFIG.GRASS_TILE_SIZE;
+  const seed = tileX * 73856093 ^ tileY * 19349663;
+  const rand = seededRandom(seed);
+
+  if (rand < 0.3) {
+    return '#2d5016';
+  } else if (rand < 0.6) {
+    return '#3d6b1f';
+  } else {
+    return '#2f4a13';
+  }
+}
+
 function drawGrassyGround() {
   const startX = Math.floor(gameState.camera.x / GAME_CONFIG.GRASS_TILE_SIZE) * GAME_CONFIG.GRASS_TILE_SIZE;
   const startY = Math.floor(gameState.camera.y / GAME_CONFIG.GRASS_TILE_SIZE) * GAME_CONFIG.GRASS_TILE_SIZE;
 
   for (let x = startX; x < gameState.camera.x + GAME_CONFIG.CANVAS_WIDTH; x += GAME_CONFIG.GRASS_TILE_SIZE) {
     for (let y = startY; y < gameState.camera.y + GAME_CONFIG.CANVAS_HEIGHT; y += GAME_CONFIG.GRASS_TILE_SIZE) {
-      const tileX = x / GAME_CONFIG.GRASS_TILE_SIZE;
-      const tileY = y / GAME_CONFIG.GRASS_TILE_SIZE;
-      const seed = tileX * 73856093 ^ tileY * 19349663;
-      const rand = seededRandom(seed);
-
-      let color;
-      if (rand < 0.3) {
-        color = '#2d5016';
-      } else if (rand < 0.6) {
-        color = '#3d6b1f';
-      } else {
-        color = '#2f4a13';
-      }
-
-      ctx.fillStyle = color;
+      ctx.fillStyle = getTerrainColor(x, y);
       const screenX = x - gameState.camera.x;
       const screenY = y - gameState.camera.y;
       ctx.fillRect(screenX, screenY, GAME_CONFIG.GRASS_TILE_SIZE, GAME_CONFIG.GRASS_TILE_SIZE);
 
       // Add subtle grass texture details
       ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+      const tileX = x / GAME_CONFIG.GRASS_TILE_SIZE;
+      const tileY = y / GAME_CONFIG.GRASS_TILE_SIZE;
+      const seed = tileX * 73856093 ^ tileY * 19349663;
       for (let i = 0; i < 3; i++) {
         const detailX = screenX + seededRandom(seed + i) * GAME_CONFIG.GRASS_TILE_SIZE;
         const detailY = screenY + seededRandom(seed + i + 100) * GAME_CONFIG.GRASS_TILE_SIZE;
@@ -160,9 +169,20 @@ function drawMinimap() {
   const minimapX = GAME_CONFIG.CANVAS_WIDTH - MINIMAP_CONFIG.WIDTH - 10;
   const minimapY = 10;
 
-  // Background
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-  ctx.fillRect(minimapX, minimapY, MINIMAP_CONFIG.WIDTH, MINIMAP_CONFIG.HEIGHT);
+  // Draw minimap terrain
+  const minimapStartX = Math.floor((minimapX * GAME_CONFIG.MAP_WIDTH / GAME_CONFIG.CANVAS_WIDTH) / (MINIMAP_CONFIG.GRASS_TILE_SIZE / MINIMAP_CONFIG.SCALE));
+  const minimapStartY = Math.floor((minimapY * GAME_CONFIG.MAP_HEIGHT / GAME_CONFIG.CANVAS_HEIGHT) / (MINIMAP_CONFIG.GRASS_TILE_SIZE / MINIMAP_CONFIG.SCALE));
+
+  for (let px = 0; px < MINIMAP_CONFIG.WIDTH; px += MINIMAP_CONFIG.GRASS_TILE_SIZE) {
+    for (let py = 0; py < MINIMAP_CONFIG.HEIGHT; py += MINIMAP_CONFIG.GRASS_TILE_SIZE) {
+      const worldX = (px / MINIMAP_CONFIG.WIDTH) * GAME_CONFIG.MAP_WIDTH;
+      const worldY = (py / MINIMAP_CONFIG.HEIGHT) * GAME_CONFIG.MAP_HEIGHT;
+      const color = getTerrainColor(worldX, worldY);
+
+      ctx.fillStyle = color;
+      ctx.fillRect(minimapX + px, minimapY + py, MINIMAP_CONFIG.GRASS_TILE_SIZE, MINIMAP_CONFIG.GRASS_TILE_SIZE);
+    }
+  }
 
   // Border
   ctx.strokeStyle = '#22c55e';
@@ -212,6 +232,44 @@ function updateCamera() {
   gameState.camera.y = Math.max(0, Math.min(gameState.camera.y, GAME_CONFIG.MAP_HEIGHT - GAME_CONFIG.CANVAS_HEIGHT));
 }
 
+function updateLocalPlayerMovement() {
+  if (!gameState.localPlayer) return;
+
+  // Calculate target velocity based on input (slower speed)
+  const speed = 3; // Reduced from 7 to 3
+  gameState.targetVelocity.x = 0;
+  gameState.targetVelocity.y = 0;
+
+  if (gameState.keys['w'] || gameState.keys['W']) {
+    gameState.targetVelocity.y -= speed;
+  }
+  if (gameState.keys['s'] || gameState.keys['S']) {
+    gameState.targetVelocity.y += speed;
+  }
+  if (gameState.keys['a'] || gameState.keys['A']) {
+    gameState.targetVelocity.x -= speed;
+  }
+  if (gameState.keys['d'] || gameState.keys['D']) {
+    gameState.targetVelocity.x += speed;
+  }
+
+  // Smoothly interpolate velocity toward target
+  gameState.velocity.x += (gameState.targetVelocity.x - gameState.velocity.x) * gameState.acceleration;
+  gameState.velocity.y += (gameState.targetVelocity.y - gameState.velocity.y) * gameState.acceleration;
+
+  // Apply friction to make movement feel smooth
+  gameState.velocity.x *= gameState.friction;
+  gameState.velocity.y *= gameState.friction;
+
+  // Update position
+  gameState.localPlayer.x += gameState.velocity.x;
+  gameState.localPlayer.y += gameState.velocity.y;
+
+  // Clamp to map bounds
+  gameState.localPlayer.x = Math.max(GAME_CONFIG.PLAYER_RADIUS, Math.min(GAME_CONFIG.MAP_WIDTH - GAME_CONFIG.PLAYER_RADIUS, gameState.localPlayer.x));
+  gameState.localPlayer.y = Math.max(GAME_CONFIG.PLAYER_RADIUS, Math.min(GAME_CONFIG.MAP_HEIGHT - GAME_CONFIG.PLAYER_RADIUS, gameState.localPlayer.y));
+}
+
 function sendInputToServer() {
   if (!gameState.ws || gameState.ws.readyState !== WebSocket.OPEN || !gameState.localPlayer) return;
 
@@ -235,6 +293,7 @@ function gameLoop() {
   ctx.fillRect(0, 0, GAME_CONFIG.CANVAS_WIDTH, GAME_CONFIG.CANVAS_HEIGHT);
 
   drawGrassyGround();
+  updateLocalPlayerMovement();
   updateCamera();
 
   if (gameState.localPlayer) {
