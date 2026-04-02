@@ -1,5 +1,5 @@
 // ===========================
-// Game Entry Point (Updated)
+// Game Entry Point (stub-friendly)
 // ===========================
 
 import { initializeGame, gameState, GAME_CONFIG } from './game.js';
@@ -14,11 +14,12 @@ if (!isLoggedIn()) {
 
   const playerInfo = document.getElementById('playerInfo');
   setInterval(() => {
-    if (gameState.localPlayer) {
+    if (playerInfo) {
+      // Show the logged-in user's info since there is no real localPlayer movement
       playerInfo.innerHTML = `
-        <strong>${gameState.localPlayer.username}</strong><br/>
+        <strong>${currentUser.username}</strong><br/>
         Map: ${GAME_CONFIG.MAP_WIDTH}x${GAME_CONFIG.MAP_HEIGHT}<br/>
-        <span style="color: #4a90e2;">● Players: ${gameState.otherPlayers.size + 1}</span>
+        <span style="color: #4a90e2;">● Players: ${gameState.otherPlayers.size + (gameState.localPlayer ? 1 : 0)}</span>
       `;
     }
   }, 500);
