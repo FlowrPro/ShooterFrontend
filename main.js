@@ -1,6 +1,6 @@
 // ===========================
 // Moborr.io Home Screen
-// Emoji-Only Version - Frontend Auth
+// Character selection in center (3 slots)
 // ===========================
 
 import { 
@@ -55,6 +55,7 @@ function renderSidebar() {
   `;
 }
 
+// Center: Character selection (3 slots)
 function renderCenter() {
   return `
     <main class="flex-1 flex flex-col items-center justify-center relative overflow-hidden">
@@ -62,23 +63,42 @@ function renderCenter() {
         <div class="absolute top-0 left-0 w-96 h-96 bg-purple-500 rounded-full blur-3xl"></div>
         <div class="absolute bottom-0 right-0 w-96 h-96 bg-blue-500 rounded-full blur-3xl"></div>
       </div>
-      <div class="relative z-10 flex flex-col items-center">
-        <div class="moborr-logo text-white mb-8 text-6xl font-black">
+
+      <div class="relative z-10 flex flex-col items-center w-full">
+        <div class="moborr-logo text-white mb-6 text-6xl font-black">
           MOBORR.IO
         </div>
-        <div class="text-purple-300 text-sm tracking-widest mb-6">BROWSER FPS • ALPHA</div>
-        <div class="mb-6" title="Your hero character">
-          <img src="./assets/logo.png" class="w-48 h-48 object-contain drop-shadow-lg" alt="Moborr Logo"/>
+
+        <div id="characterSelectionWrapper" class="w-full max-w-3xl px-6">
+          <div class="bg-black bg-opacity-60 rounded-xl p-6 border border-purple-500 border-opacity-30 shadow-lg">
+            <h2 class="text-white text-2xl font-bold mb-4">Select Your Character</h2>
+
+            <div id="characterSlots" class="grid grid-cols-3 gap-4">
+              <!-- Character slots will be injected here -->
+              <div class="character-slot p-4 rounded bg-gray-900 bg-opacity-40 flex flex-col items-center justify-center cursor-pointer select-none" data-slot="0">
+                <div class="text-5xl mb-3">🔲</div>
+                <div class="text-gray-300">Loading...</div>
+              </div>
+              <div class="character-slot p-4 rounded bg-gray-900 bg-opacity-40 flex flex-col items-center justify-center cursor-pointer select-none" data-slot="1">
+                <div class="text-5xl mb-3">🔲</div>
+                <div class="text-gray-300">Loading...</div>
+              </div>
+              <div class="character-slot p-4 rounded bg-gray-900 bg-opacity-40 flex flex-col items-center justify-center cursor-pointer select-none" data-slot="2">
+                <div class="text-5xl mb-3">🔲</div>
+                <div class="text-gray-300">Loading...</div>
+              </div>
+            </div>
+
+            <div class="mt-6 text-center">
+              <button id="enterWorldBtn" class="bg-yellow-400 text-black font-black rounded-full px-6 py-2 shadow hover:scale-105 transition disabled:opacity-60" disabled>
+                Enter World
+              </button>
+            </div>
+          </div>
         </div>
-        <button id="playBtn" class="bg-yellow-400 hover:bg-yellow-300 active:bg-yellow-500 text-black font-black rounded-full px-12 py-4 text-2xl shadow-lg transition transform hover:scale-105 mb-6">
-          ► PLAY NOW
-        </button>
-        <div class="flex justify-center gap-3 mb-6">
-          <button class="center-btn bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded font-bold transition" data-modal="leaderboards">Leaderboards</button>
-          <button class="center-btn bg-gray-700 hover:bg-gray-600 text-white px-6 py-2 rounded font-bold transition" data-modal="settings">Settings</button>
-        </div>
-        <div class="text-center text-gray-300 text-xs">
-          <p>v0.1 Alpha • Inspired by Krunker & Kirka</p>
+
+        <div class="text-center text-gray-300 text-xs mt-6">
+          <p>v0.1 Alpha • Character system</p>
           <p class="mt-1 text-green-400">🟢 Server Online</p>
         </div>
       </div>
@@ -128,6 +148,7 @@ function renderRightPanel() {
   `;
 }
 
+// Reuse profile modal logic from previous implementation if needed (keeps login/register)
 function getModalContent(modalName) {
   const modalTitles = {
     hub: "HUB",
@@ -224,23 +245,188 @@ function getModalContent(modalName) {
   `;
 }
 
+// Modal helper used for character name entry (custom)
+function openCharacterNameModal(slot, currentName = '') {
+  // If not logged in, open profile modal instead
+  if (!isLoggedIn()) {
+    openModal('profile');
+    return;
+  }
+
+  // remove if exists
+  document.getElementById('charNameModal')?.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'charNameModal';
+  overlay.className = 'fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50';
+  overlay.innerHTML = `
+    <div class="bg-gradient-to-br from-gray-900 to-gray-800 rounded-lg shadow-2xl border-2 border-purple-500 w-96 p-6 relative">
+      <button id="closeCharModal" class="absolute top-4 right-4 bg-red-600 hover:bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold text-lg">✕</button>
+      <h2 class="text-center text-2xl font-black text-white mb-4">Name Character</h2>
+      <p class="text-center text-gray-300 mb-4">Assign a permanent name to this character slot.</p>
+      <input id="charNameInput" type="text" maxlength="24" placeholder="Character Name" class="w-full bg-gray-800 text-white px-4 py-2 rounded border border-purple-500 focus:outline-none mb-4" value="${currentName ? currentName : ''}" />
+      <div class="flex gap-2">
+        <button id="saveCharBtn" class="flex-1 bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded font-bold">Save</button>
+        <button id="cancelCharBtn" class="flex-1 bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded font-bold">Cancel</button>
+      </div>
+      <div id="charSaveMessage" class="mt-3 text-sm text-yellow-300"></div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  document.getElementById('closeCharModal')?.addEventListener('click', () => overlay.remove());
+  document.getElementById('cancelCharBtn')?.addEventListener('click', () => overlay.remove());
+
+  document.getElementById('saveCharBtn')?.addEventListener('click', async () => {
+    const input = document.getElementById('charNameInput');
+    const message = document.getElementById('charSaveMessage');
+    const name = input.value.trim();
+
+    if (!name) {
+      message.textContent = '❌ Name cannot be empty';
+      return;
+    }
+    if (name.length < 2) {
+      message.textContent = '❌ Must be at least 2 characters';
+      return;
+    }
+
+    message.textContent = '🔄 Saving...';
+
+    try {
+      const res = await fetch(`${window.location.origin}/characters`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({ slot, name, avatar: currentUser?.avatar ?? '😎' })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        message.textContent = `❌ ${data.error || 'Save failed'}`;
+        return;
+      }
+
+      // success
+      message.textContent = '✅ Saved!';
+      // refresh character slots UI
+      await loadCharacterSlots();
+      setTimeout(() => overlay.remove(), 500);
+    } catch (err) {
+      console.error('Save character error:', err);
+      message.textContent = '❌ Network error';
+    }
+  });
+}
+
+async function loadCharacterSlots() {
+  const container = document.getElementById('characterSlots');
+  if (!container) return;
+
+  // show loading placeholders
+  container.querySelectorAll('.character-slot').forEach((el) => {
+    el.innerHTML = `<div class="text-5xl mb-3">⏳</div><div class="text-gray-300">Loading...</div>`;
+  });
+
+  if (!isLoggedIn()) {
+    // Not logged in — show empty slots and prompt to login on click
+    container.innerHTML = '';
+    for (let i = 0; i < 3; i++) {
+      const slotEl = document.createElement('div');
+      slotEl.className = 'character-slot p-6 rounded bg-gray-900 bg-opacity-40 flex flex-col items-center justify-center cursor-pointer select-none';
+      slotEl.dataset.slot = String(i);
+      slotEl.innerHTML = `<div class="text-5xl mb-3">🔒</div><div class="text-gray-300">Login to create</div>`;
+      slotEl.addEventListener('click', () => openModal('profile'));
+      container.appendChild(slotEl);
+    }
+    (document.getElementById('enterWorldBtn') || {}).disabled = true;
+    return;
+  }
+
+  try {
+    const res = await fetch(`${window.location.origin}/characters`, {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    if (!res.ok) {
+      console.error('Failed to fetch characters', await res.text());
+      // fallback: show empty slots
+      container.innerHTML = '';
+      for (let i = 0; i < 3; i++) {
+        const slotEl = document.createElement('div');
+        slotEl.className = 'character-slot p-6 rounded bg-gray-900 bg-opacity-40 flex flex-col items-center justify-center cursor-pointer select-none';
+        slotEl.dataset.slot = String(i);
+        slotEl.innerHTML = `<div class="text-5xl mb-3">🟦</div><div class="text-gray-300">Empty<br/><span class="text-xs text-gray-400">Click to create</span></div>`;
+        slotEl.addEventListener('click', () => openCharacterNameModal(i));
+        container.appendChild(slotEl);
+      }
+      (document.getElementById('enterWorldBtn') || {}).disabled = true;
+      return;
+    }
+
+    const data = await res.json();
+    const chars = data.characters || [null, null, null];
+    container.innerHTML = '';
+
+    chars.forEach((c, i) => {
+      const slotEl = document.createElement('div');
+      slotEl.className = 'character-slot p-6 rounded bg-gray-900 bg-opacity-40 flex flex-col items-center justify-center cursor-pointer select-none hover:bg-gray-800';
+      slotEl.dataset.slot = String(i);
+
+      if (c) {
+        slotEl.innerHTML = `
+          <div class="text-5xl mb-3">${c.avatar ?? '😎'}</div>
+          <div class="text-white font-bold">${c.name}</div>
+          <div class="text-xs text-gray-400 mt-1">Slot ${i + 1}</div>
+        `;
+        slotEl.addEventListener('click', () => openCharacterNameModal(i, c.name));
+      } else {
+        slotEl.innerHTML = `
+          <div class="text-5xl mb-3">➕</div>
+          <div class="text-gray-300 font-bold">Empty</div>
+          <div class="text-xs text-gray-400 mt-1">Click to create character</div>
+        `;
+        slotEl.addEventListener('click', () => openCharacterNameModal(i));
+      }
+
+      container.appendChild(slotEl);
+    });
+
+    // enable Enter World if at least one character exists
+    const any = chars.some(Boolean);
+    const enterBtn = document.getElementById('enterWorldBtn');
+    if (enterBtn) {
+      enterBtn.disabled = !any;
+      enterBtn.onclick = () => {
+        // Choose first non-null character for now (we'll expand later)
+        const first = chars.find(Boolean);
+        if (!first) return;
+        // store selected character id temporarily and proceed (we'll implement next steps later)
+        localStorage.setItem('moborr_selected_character', JSON.stringify(first));
+        // For now just alert and keep user on the home screen
+        alert(`Selected ${first.name} (slot ${first.slot}). We'll continue flow later.`);
+      };
+    }
+  } catch (err) {
+    console.error('Error loading characters:', err);
+  }
+}
+
+// Open generic modal (profile etc.)
 function openModal(modalName) {
   const existingModal = document.getElementById("modalOverlay");
-  if (existingModal) {
-    existingModal.remove();
-  }
+  if (existingModal) existingModal.remove();
 
   const modalHTML = getModalContent(modalName);
   document.body.insertAdjacentHTML("beforeend", modalHTML);
 
-  // Close button handlers
   document.getElementById("closeModal")?.addEventListener("click", closeModal);
   document.getElementById("closeModalBtn")?.addEventListener("click", closeModal);
   document.getElementById("closeProfileBtn")?.addEventListener("click", closeModal);
   document.getElementById("modalOverlay")?.addEventListener("click", (e) => {
-    if (e.target.id === "modalOverlay") {
-      closeModal();
-    }
+    if (e.target.id === "modalOverlay") closeModal();
   });
 
   // Auth handlers (if profile modal)
@@ -305,11 +491,10 @@ function openModal(modalName) {
 
 function closeModal() {
   const modal = document.getElementById("modalOverlay");
-  if (modal) {
-    modal.remove();
-  }
+  if (modal) modal.remove();
 }
 
+// Setup nav/modal event listeners and center slot clicks are attached in loadCharacterSlots
 function setupEventListeners() {
   document.querySelectorAll(".nav-item-btn").forEach((btn) => {
     btn.addEventListener("click", (e) => {
@@ -334,10 +519,11 @@ function setupEventListeners() {
 
 function renderApp() {
   const app = document.getElementById("app");
-  if (app) {
-    app.innerHTML = renderSidebar() + renderCenter() + renderRightPanel();
-    setupEventListeners();
-  }
+  if (!app) return;
+  app.innerHTML = renderSidebar() + renderCenter() + renderRightPanel();
+  setupEventListeners();
+  // after DOM inserted, populate dynamic character slots
+  loadCharacterSlots();
 }
 
 // Initialize
