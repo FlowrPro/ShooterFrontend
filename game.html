@@ -3,56 +3,24 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Moborr.io - Gameplay</title>
+  <title>Moborr.io - Gameplay (Coming Soon)</title>
   <link rel="icon" type="image/png" href="./assets/logo.png">
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    body {
-      overflow: hidden;
-      background: #000;
-      font-family: 'Orbitron', Arial, sans-serif;
-    }
-
-    #gameCanvas {
-      display: block;
-      width: 100vw;
-      height: 100vh;
-    }
-
-    #gameHUD {
-      position: fixed;
-      top: 10px;
-      left: 10px;
-      color: #fff;
-      font-size: 14px;
-      background: rgba(0, 0, 0, 0.7);
-      padding: 10px;
-      border: 2px solid #a855f7;
-      border-radius: 5px;
-      z-index: 10;
-    }
-
-    #escapeHint {
-      position: fixed;
-      bottom: 10px;
-      right: 10px;
-      color: #aaa;
-      font-size: 12px;
-      text-align: right;
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Orbitron', Arial, sans-serif; background: #000; color: #fff; }
+    #gameHUD { position: fixed; top: 10px; left: 10px; color: #fff; font-size: 14px;
+      background: rgba(0,0,0,0.7); padding: 10px; border: 2px solid #a855f7; border-radius: 5px; z-index: 10;
     }
   </style>
 </head>
 <body>
-  <canvas id="gameCanvas"></canvas>
+  <div id="gameContainer" style="width:100%; height:100vh;"></div>
+
   <div id="gameHUD">
     <div id="playerInfo">Loading...</div>
   </div>
-  <div id="escapeHint">
+
+  <div id="escapeHint" style="position:fixed; bottom:10px; right:10px; color:#aaa; font-size:12px;">
     Press <strong>ESC</strong> to return to menu
   </div>
 
