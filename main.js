@@ -14,6 +14,8 @@ import {
   BACKEND_URL
 } from './auth.js';
 
+let selectedCharacter = null;
+
 function renderSidebar() {
   const profileName = isLoggedIn() ? currentUser.username : 'Login/Register';
   const profileAvatar = isLoggedIn() ? currentUser.avatar : '🔐';
@@ -149,7 +151,6 @@ function renderRightPanel() {
   `;
 }
 
-// Reuse profile modal logic from previous implementation if needed (keeps login/register)
 function getModalContent(modalName) {
   const modalTitles = {
     hub: "HUB",
@@ -167,10 +168,8 @@ function getModalContent(modalName) {
     profile: "PROFILE"
   };
 
-  // Profile Modal (Login/Register)
   if (modalName === 'profile') {
     if (isLoggedIn()) {
-      // Logged in view
       return `
         <div class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50" id="modalOverlay">
           <div class="bg-gradient-to-br from-gray-900 to-gray-800 rounded-lg shadow-2xl border-2 border-purple-500 w-96 p-6 relative">
@@ -195,7 +194,6 @@ function getModalContent(modalName) {
         </div>
       `;
     } else {
-      // Not logged in view - show login/register form
       return `
         <div class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50" id="modalOverlay">
           <div class="bg-gradient-to-br from-gray-900 to-gray-800 rounded-lg shadow-2xl border-2 border-purple-500 w-96 p-6 relative">
@@ -223,7 +221,6 @@ function getModalContent(modalName) {
     }
   }
 
-  // Default modal for other screens
   return `
     <div class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50" id="modalOverlay">
       <div class="bg-gradient-to-br from-gray-900 to-gray-800 rounded-lg shadow-2xl border-2 border-purple-500 w-96 p-6 relative">
@@ -246,176 +243,7 @@ function getModalContent(modalName) {
   `;
 }
 
-// Modal helper used for character name entry (custom)
-function openCharacterNameModal(slot, currentName = '') {
-  // If not logged in, open profile modal instead
-  if (!isLoggedIn()) {
-    openModal('profile');
-    return;
-  }
-
-  // remove if exists
-  document.getElementById('charNameModal')?.remove();
-
-  const overlay = document.createElement('div');
-  overlay.id = 'charNameModal';
-  overlay.className = 'fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50';
-  overlay.innerHTML = `
-    <div class="bg-gradient-to-br from-gray-900 to-gray-800 rounded-lg shadow-2xl border-2 border-purple-500 w-96 p-6 relative">
-      <button id="closeCharModal" class="absolute top-4 right-4 bg-red-600 hover:bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold text-lg">✕</button>
-      <h2 class="text-center text-2xl font-black text-white mb-4">Name Character</h2>
-      <p class="text-center text-gray-300 mb-4">Assign a permanent name to this character slot.</p>
-      <input id="charNameInput" type="text" maxlength="24" placeholder="Character Name" class="w-full bg-gray-800 text-white px-4 py-2 rounded border border-purple-500 focus:outline-none mb-4" value="${currentName ? currentName : ''}" />
-      <div class="flex gap-2">
-        <button id="saveCharBtn" class="flex-1 bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded font-bold">Save</button>
-        <button id="cancelCharBtn" class="flex-1 bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded font-bold">Cancel</button>
-      </div>
-      <div id="charSaveMessage" class="mt-3 text-sm text-yellow-300"></div>
-    </div>
-  `;
-
-  document.body.appendChild(overlay);
-
-  document.getElementById('closeCharModal')?.addEventListener('click', () => overlay.remove());
-  document.getElementById('cancelCharBtn')?.addEventListener('click', () => overlay.remove());
-
-  document.getElementById('saveCharBtn')?.addEventListener('click', async () => {
-    const input = document.getElementById('charNameInput');
-    const message = document.getElementById('charSaveMessage');
-    const name = input.value.trim();
-
-    if (!name) {
-      message.textContent = '❌ Name cannot be empty';
-      return;
-    }
-    if (name.length < 2) {
-      message.textContent = '❌ Must be at least 2 characters';
-      return;
-    }
-
-    message.textContent = '🔄 Saving...';
-
-    try {
-      const res = await fetch(`${BACKEND_URL}/characters`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`
-        },
-        body: JSON.stringify({ slot, name, avatar: currentUser?.avatar ?? '😎' })
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        message.textContent = `❌ ${data.error || 'Save failed'}`;
-        return;
-      }
-
-      // success
-      message.textContent = '✅ Saved!';
-      // refresh character slots UI
-      await loadCharacterSlots();
-      setTimeout(() => overlay.remove(), 500);
-    } catch (err) {
-      console.error('Save character error:', err);
-      message.textContent = '❌ Network error';
-    }
-  });
-}
-
-async function loadCharacterSlots() {
-  const container = document.getElementById('characterSlots');
-  if (!container) return;
-
-  // show loading placeholders
-  container.querySelectorAll('.character-slot').forEach((el) => {
-    el.innerHTML = `<div class="text-5xl mb-3">⏳</div><div class="text-gray-300">Loading...</div>`;
-  });
-
-  if (!isLoggedIn()) {
-    // Not logged in — show empty slots and prompt to login on click
-    container.innerHTML = '';
-    for (let i = 0; i < 3; i++) {
-      const slotEl = document.createElement('div');
-      slotEl.className = 'character-slot p-6 rounded bg-gray-900 bg-opacity-40 flex flex-col items-center justify-center cursor-pointer select-none';
-      slotEl.dataset.slot = String(i);
-      slotEl.innerHTML = `<div class="text-5xl mb-3">🔒</div><div class="text-gray-300">Login to create</div>`;
-      slotEl.addEventListener('click', () => openModal('profile'));
-      container.appendChild(slotEl);
-    }
-    (document.getElementById('enterWorldBtn') || {}).disabled = true;
-    return;
-  }
-
-  try {
-    const res = await fetch(`${BACKEND_URL}/characters`, {
-      headers: { 'Authorization': `Bearer ${authToken}` }
-    });
-    if (!res.ok) {
-      console.error('Failed to fetch characters', await res.text());
-      // fallback: show empty slots
-      container.innerHTML = '';
-      for (let i = 0; i < 3; i++) {
-        const slotEl = document.createElement('div');
-        slotEl.className = 'character-slot p-6 rounded bg-gray-900 bg-opacity-40 flex flex-col items-center justify-center cursor-pointer select-none';
-        slotEl.dataset.slot = String(i);
-        slotEl.innerHTML = `<div class="text-5xl mb-3">🟦</div><div class="text-gray-300">Empty<br/><span class="text-xs text-gray-400">Click to create</span></div>`;
-        slotEl.addEventListener('click', () => openCharacterNameModal(i));
-        container.appendChild(slotEl);
-      }
-      (document.getElementById('enterWorldBtn') || {}).disabled = true;
-      return;
-    }
-
-    const data = await res.json();
-    const chars = data.characters || [null, null, null];
-    container.innerHTML = '';
-
-    chars.forEach((c, i) => {
-      const slotEl = document.createElement('div');
-      slotEl.className = 'character-slot p-6 rounded bg-gray-900 bg-opacity-40 flex flex-col items-center justify-center cursor-pointer select-none hover:bg-gray-800';
-      slotEl.dataset.slot = String(i);
-
-      if (c) {
-        slotEl.innerHTML = `
-          <div class="text-5xl mb-3">${c.avatar ?? '😎'}</div>
-          <div class="text-white font-bold">${c.name}</div>
-          <div class="text-xs text-gray-400 mt-1">Slot ${i + 1}</div>
-        `;
-        slotEl.addEventListener('click', () => openCharacterNameModal(i, c.name));
-      } else {
-        slotEl.innerHTML = `
-          <div class="text-5xl mb-3">➕</div>
-          <div class="text-gray-300 font-bold">Empty</div>
-          <div class="text-xs text-gray-400 mt-1">Click to create character</div>
-        `;
-        slotEl.addEventListener('click', () => openCharacterNameModal(i));
-      }
-
-      container.appendChild(slotEl);
-    });
-
-    // enable Enter World if at least one character exists
-    const any = chars.some(Boolean);
-    const enterBtn = document.getElementById('enterWorldBtn');
-    if (enterBtn) {
-      enterBtn.disabled = !any;
-      enterBtn.onclick = () => {
-        // Choose first non-null character for now (we'll expand later)
-        const first = chars.find(Boolean);
-        if (!first) return;
-        // store selected character id temporarily and proceed (we'll implement next steps later)
-        localStorage.setItem('moborr_selected_character', JSON.stringify(first));
-        // For now just alert and keep user on the home screen
-        alert(`Selected ${first.name} (slot ${first.slot}). We'll continue flow later.`);
-      };
-    }
-  } catch (err) {
-    console.error('Error loading characters:', err);
-  }
-}
-
-// Open generic modal (profile etc.)
+// Open generic modal
 function openModal(modalName) {
   const existingModal = document.getElementById("modalOverlay");
   if (existingModal) existingModal.remove();
@@ -430,7 +258,6 @@ function openModal(modalName) {
     if (e.target.id === "modalOverlay") closeModal();
   });
 
-  // Auth handlers (if profile modal)
   if (modalName === 'profile' && !isLoggedIn()) {
     document.getElementById("loginBtn")?.addEventListener("click", async () => {
       const username = document.getElementById("authUsername").value;
@@ -480,7 +307,6 @@ function openModal(modalName) {
     });
   }
 
-  // Logout handler
   if (modalName === 'profile' && isLoggedIn()) {
     document.getElementById("logoutBtn")?.addEventListener("click", () => {
       logout();
@@ -495,7 +321,167 @@ function closeModal() {
   if (modal) modal.remove();
 }
 
-// Setup nav/modal event listeners and center slot clicks are attached in loadCharacterSlots
+async function loadCharacterSlots() {
+  const container = document.getElementById('characterSlots');
+  if (!container) return;
+
+  container.querySelectorAll('.character-slot').forEach((el) => {
+    el.innerHTML = `<div class="text-5xl mb-3">⏳</div><div class="text-gray-300">Loading...</div>`;
+  });
+
+  if (!isLoggedIn()) {
+    container.innerHTML = '';
+    for (let i = 0; i < 3; i++) {
+      const slotEl = document.createElement('div');
+      slotEl.className = 'character-slot p-6 rounded bg-gray-900 bg-opacity-40 flex flex-col items-center justify-center cursor-pointer select-none';
+      slotEl.dataset.slot = String(i);
+      slotEl.innerHTML = `<div class="text-5xl mb-3">🔒</div><div class="text-gray-300">Login to create</div>`;
+      slotEl.addEventListener('click', () => openModal('profile'));
+      container.appendChild(slotEl);
+    }
+    (document.getElementById('enterWorldBtn') || {}).disabled = true;
+    return;
+  }
+
+  try {
+    const res = await fetch(`${BACKEND_URL}/characters`, {
+      headers: { 'Authorization': `Bearer ${authToken}` }
+    });
+    if (!res.ok) {
+      console.error('Failed to fetch characters', await res.text());
+      container.innerHTML = '';
+      for (let i = 0; i < 3; i++) {
+        const slotEl = document.createElement('div');
+        slotEl.className = 'character-slot p-6 rounded bg-gray-900 bg-opacity-40 flex flex-col items-center justify-center cursor-pointer select-none';
+        slotEl.dataset.slot = String(i);
+        slotEl.innerHTML = `<div class="text-5xl mb-3">🟦</div><div class="text-gray-300">Empty<br/><span class="text-xs text-gray-400">Click to create</span></div>`;
+        slotEl.addEventListener('click', () => openCreateCharacterModal(i));
+        container.appendChild(slotEl);
+      }
+      (document.getElementById('enterWorldBtn') || {}).disabled = true;
+      return;
+    }
+
+    const data = await res.json();
+    const chars = data.characters || [null, null, null];
+    container.innerHTML = '';
+
+    chars.forEach((c, i) => {
+      const slotEl = document.createElement('div');
+      slotEl.className = 'character-slot p-6 rounded bg-gray-900 bg-opacity-40 flex flex-col items-center justify-center cursor-pointer select-none hover:bg-gray-800 transition';
+      slotEl.dataset.slot = String(i);
+
+      if (c) {
+        const isSelected = selectedCharacter && selectedCharacter.id === c.id;
+        slotEl.className += isSelected ? ' border-2 border-yellow-400' : '';
+        slotEl.innerHTML = `
+          <div class="text-5xl mb-3">${c.avatar ?? '😎'}</div>
+          <div class="text-white font-bold">${c.name}</div>
+          <div class="text-xs text-gray-400 mt-1">Slot ${i + 1}</div>
+        `;
+        slotEl.addEventListener('click', () => {
+          selectedCharacter = c;
+          loadCharacterSlots();
+        });
+      } else {
+        slotEl.innerHTML = `
+          <div class="text-5xl mb-3">➕</div>
+          <div class="text-gray-300 font-bold">Empty</div>
+          <div class="text-xs text-gray-400 mt-1">Click to create character</div>
+        `;
+        slotEl.addEventListener('click', () => openCreateCharacterModal(i));
+      }
+
+      container.appendChild(slotEl);
+    });
+
+    const any = chars.some(Boolean);
+    const enterBtn = document.getElementById('enterWorldBtn');
+    if (enterBtn) {
+      enterBtn.disabled = !selectedCharacter;
+      enterBtn.onclick = () => {
+        if (!selectedCharacter) return;
+        localStorage.setItem('moborr_selected_character', JSON.stringify(selectedCharacter));
+        window.location.href = './game.html';
+      };
+    }
+  } catch (err) {
+    console.error('Error loading characters:', err);
+  }
+}
+
+function openCreateCharacterModal(slot) {
+  if (!isLoggedIn()) {
+    openModal('profile');
+    return;
+  }
+
+  document.getElementById('charNameModal')?.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'charNameModal';
+  overlay.className = 'fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50';
+  overlay.innerHTML = `
+    <div class="bg-gradient-to-br from-gray-900 to-gray-800 rounded-lg shadow-2xl border-2 border-purple-500 w-96 p-6 relative">
+      <button id="closeCharModal" class="absolute top-4 right-4 bg-red-600 hover:bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold text-lg">✕</button>
+      <h2 class="text-center text-2xl font-black text-white mb-4">Name Character</h2>
+      <p class="text-center text-gray-300 mb-4">Assign a permanent name to this character slot.</p>
+      <input id="charNameInput" type="text" maxlength="24" placeholder="Character Name" class="w-full bg-gray-800 text-white px-4 py-2 rounded border border-purple-500 focus:outline-none mb-4" />
+      <div class="flex gap-2">
+        <button id="saveCharBtn" class="flex-1 bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded font-bold">Save</button>
+        <button id="cancelCharBtn" class="flex-1 bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded font-bold">Cancel</button>
+      </div>
+      <div id="charSaveMessage" class="mt-3 text-sm text-yellow-300"></div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  document.getElementById('closeCharModal')?.addEventListener('click', () => overlay.remove());
+  document.getElementById('cancelCharBtn')?.addEventListener('click', () => overlay.remove());
+
+  document.getElementById('saveCharBtn')?.addEventListener('click', async () => {
+    const input = document.getElementById('charNameInput');
+    const message = document.getElementById('charSaveMessage');
+    const name = input.value.trim();
+
+    if (!name) {
+      message.textContent = '❌ Name cannot be empty';
+      return;
+    }
+    if (name.length < 2) {
+      message.textContent = '❌ Must be at least 2 characters';
+      return;
+    }
+
+    message.textContent = '🔄 Saving...';
+
+    try {
+      const res = await fetch(`${BACKEND_URL}/characters`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({ slot, name, avatar: currentUser?.avatar ?? '😎' })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        message.textContent = `❌ ${data.error || 'Save failed'}`;
+        return;
+      }
+
+      message.textContent = '✅ Saved!';
+      await loadCharacterSlots();
+      setTimeout(() => overlay.remove(), 500);
+    } catch (err) {
+      console.error('Save character error:', err);
+      message.textContent = '❌ Network error';
+    }
+  });
+}
+
 function setupEventListeners() {
   document.querySelectorAll(".nav-item-btn").forEach((btn) => {
     btn.addEventListener("click", (e) => {
@@ -513,7 +499,6 @@ function setupEventListeners() {
 
   const playBtn = document.getElementById("playBtn");
   playBtn?.addEventListener("click", () => {
-    // Navigate to game page
     window.location.href = './game.html';
   });
 }
@@ -523,11 +508,9 @@ function renderApp() {
   if (!app) return;
   app.innerHTML = renderSidebar() + renderCenter() + renderRightPanel();
   setupEventListeners();
-  // after DOM inserted, populate dynamic character slots
   loadCharacterSlots();
 }
 
-// Initialize
 loadUserFromStorage();
 
 if (document.readyState === "loading") {
