@@ -22,22 +22,14 @@ const MINIMAP_CONFIG = {
   GRASS_TILE_SIZE: 2
 };
 
-// Movement smoothing constants
-const MOVEMENT_CONFIG = {
-  MAX_SPEED: 200,
-  ACCELERATION: 0.15,
-  DECELERATION: 0.25,
-  FRICTION: 0.92
-};
-
-// Castle configuration
+// Castle configuration (3x bigger, thicker walls/towers)
 const CASTLE_CONFIG = {
   CENTER_X: 25000,
   CENTER_Y: 25000,
-  CASTLE_SIZE: 800, // Width/height of castle
-  TOWER_SIZE: 150, // Size of each tower
-  WALL_THICKNESS: 40,
-  INNER_RADIUS: 400 // Radius to determine if player is inside
+  CASTLE_SIZE: 2400, // 3x original
+  TOWER_SIZE: 450, // 3x original
+  WALL_THICKNESS: 120, // 3x original
+  INNER_SIZE: 1200 // Inner square for floor (half of castle size for interior space)
 };
 
 let gameState = {
@@ -54,7 +46,8 @@ let gameState = {
   groundTexture: null,
   lastFrameTime: Date.now(),
   deltaTime: 0,
-  isPlayerInCastle: false
+  isPlayerInCastle: false,
+  lastServerUpdateTime: 0
 };
 
 const canvas = document.getElementById('gameCanvas');
@@ -86,10 +79,13 @@ function loadGroundTexture() {
 
 // Check if player is inside castle
 function isPlayerInsideCastle(x, y) {
-  const dx = x - CASTLE_CONFIG.CENTER_X;
-  const dy = y - CASTLE_CONFIG.CENTER_Y;
-  const distance = Math.sqrt(dx * dx + dy * dy);
-  return distance < CASTLE_CONFIG.INNER_RADIUS;
+  const halfSize = CASTLE_CONFIG.CASTLE_SIZE / 2;
+  const dx = Math.abs(x - CASTLE_CONFIG.CENTER_X);
+  const dy = Math.abs(y - CASTLE_CONFIG.CENTER_Y);
+  
+  // Check if inside the square castle bounds (with some margin for walls)
+  return dx < halfSize - CASTLE_CONFIG.WALL_THICKNESS * 2 && 
+         dy < halfSize - CASTLE_CONFIG.WALL_THICKNESS * 2;
 }
 
 // Draw ground using texture
@@ -107,33 +103,47 @@ function drawGrassyGround() {
   }
 }
 
-// Draw castle interior (wood floor, viewed from above inside)
+// Draw castle interior (wood floor, matching castle square size)
 function drawCastleInterior() {
   const castleScreenX = CASTLE_CONFIG.CENTER_X - gameState.camera.x;
   const castleScreenY = CASTLE_CONFIG.CENTER_Y - gameState.camera.y;
+  const halfSize = CASTLE_CONFIG.CASTLE_SIZE / 2;
+  const wallThickness = CASTLE_CONFIG.WALL_THICKNESS;
   
-  // Wood floor with planks
+  // Wood floor - matches exact castle interior dimensions
   ctx.fillStyle = '#8B6F47';
-  ctx.beginPath();
-  ctx.arc(castleScreenX, castleScreenY, CASTLE_CONFIG.INNER_RADIUS, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.fillRect(
+    castleScreenX - halfSize + wallThickness,
+    castleScreenY - halfSize + wallThickness,
+    CASTLE_CONFIG.CASTLE_SIZE - wallThickness * 2,
+    CASTLE_CONFIG.CASTLE_SIZE - wallThickness * 2
+  );
   
   // Add wood plank details
   ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
-  ctx.lineWidth = 2;
-  for (let i = -CASTLE_CONFIG.INNER_RADIUS; i < CASTLE_CONFIG.INNER_RADIUS; i += 30) {
+  ctx.lineWidth = 3;
+  const plankSpacing = 50;
+  const startX = castleScreenX - halfSize + wallThickness;
+  const startY = castleScreenY - halfSize + wallThickness;
+  const endX = startX + CASTLE_CONFIG.CASTLE_SIZE - wallThickness * 2;
+  const endY = startY + CASTLE_CONFIG.CASTLE_SIZE - wallThickness * 2;
+  
+  for (let i = startX; i < endX; i += plankSpacing) {
     ctx.beginPath();
-    ctx.moveTo(castleScreenX + i, castleScreenY - CASTLE_CONFIG.INNER_RADIUS);
-    ctx.lineTo(castleScreenX + i, castleScreenY + CASTLE_CONFIG.INNER_RADIUS);
+    ctx.moveTo(i, startY);
+    ctx.lineTo(i, endY);
     ctx.stroke();
   }
   
-  // Inner circle highlight (roof edges visible from inside)
+  // Inner wood border
   ctx.strokeStyle = 'rgba(139, 111, 71, 0.6)';
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.arc(castleScreenX, castleScreenY, CASTLE_CONFIG.INNER_RADIUS - 10, 0, Math.PI * 2);
-  ctx.stroke();
+  ctx.lineWidth = 4;
+  ctx.strokeRect(
+    castleScreenX - halfSize + wallThickness,
+    castleScreenY - halfSize + wallThickness,
+    CASTLE_CONFIG.CASTLE_SIZE - wallThickness * 2,
+    CASTLE_CONFIG.CASTLE_SIZE - wallThickness * 2
+  );
 }
 
 // Draw castle exterior (proper castle with towers)
@@ -141,13 +151,15 @@ function drawCastleExterior() {
   const castleScreenX = CASTLE_CONFIG.CENTER_X - gameState.camera.x;
   const castleScreenY = CASTLE_CONFIG.CENTER_Y - gameState.camera.y;
   const halfSize = CASTLE_CONFIG.CASTLE_SIZE / 2;
+  const towerSize = CASTLE_CONFIG.TOWER_SIZE;
+  const wallThickness = CASTLE_CONFIG.WALL_THICKNESS;
   
   // Draw 4 towers at corners
   const towers = [
     { x: -halfSize, y: -halfSize }, // Top-left
-    { x: halfSize, y: -halfSize },  // Top-right
-    { x: halfSize, y: halfSize },   // Bottom-right
-    { x: -halfSize, y: halfSize }   // Bottom-left
+    { x: halfSize - towerSize, y: -halfSize },  // Top-right
+    { x: halfSize - towerSize, y: halfSize - towerSize },   // Bottom-right
+    { x: -halfSize, y: halfSize - towerSize }   // Bottom-left
   ];
   
   towers.forEach((tower) => {
@@ -160,107 +172,99 @@ function drawCastleExterior() {
   // Draw castle walls between towers
   ctx.fillStyle = '#A0826D';
   ctx.strokeStyle = '#6B5D52';
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 3;
   
   // Top wall
   ctx.fillRect(
-    castleScreenX - halfSize + CASTLE_CONFIG.TOWER_SIZE,
+    castleScreenX - halfSize + towerSize,
     castleScreenY - halfSize,
-    CASTLE_CONFIG.CASTLE_SIZE - CASTLE_CONFIG.TOWER_SIZE * 2,
-    CASTLE_CONFIG.WALL_THICKNESS
+    CASTLE_CONFIG.CASTLE_SIZE - towerSize * 2,
+    wallThickness
   );
   ctx.strokeRect(
-    castleScreenX - halfSize + CASTLE_CONFIG.TOWER_SIZE,
+    castleScreenX - halfSize + towerSize,
     castleScreenY - halfSize,
-    CASTLE_CONFIG.CASTLE_SIZE - CASTLE_CONFIG.TOWER_SIZE * 2,
-    CASTLE_CONFIG.WALL_THICKNESS
+    CASTLE_CONFIG.CASTLE_SIZE - towerSize * 2,
+    wallThickness
   );
   
   // Bottom wall
   ctx.fillRect(
-    castleScreenX - halfSize + CASTLE_CONFIG.TOWER_SIZE,
-    castleScreenY + halfSize - CASTLE_CONFIG.WALL_THICKNESS,
-    CASTLE_CONFIG.CASTLE_SIZE - CASTLE_CONFIG.TOWER_SIZE * 2,
-    CASTLE_CONFIG.WALL_THICKNESS
+    castleScreenX - halfSize + towerSize,
+    castleScreenY + halfSize - wallThickness,
+    CASTLE_CONFIG.CASTLE_SIZE - towerSize * 2,
+    wallThickness
   );
   ctx.strokeRect(
-    castleScreenX - halfSize + CASTLE_CONFIG.TOWER_SIZE,
-    castleScreenY + halfSize - CASTLE_CONFIG.WALL_THICKNESS,
-    CASTLE_CONFIG.CASTLE_SIZE - CASTLE_CONFIG.TOWER_SIZE * 2,
-    CASTLE_CONFIG.WALL_THICKNESS
+    castleScreenX - halfSize + towerSize,
+    castleScreenY + halfSize - wallThickness,
+    CASTLE_CONFIG.CASTLE_SIZE - towerSize * 2,
+    wallThickness
   );
   
   // Left wall
   ctx.fillRect(
     castleScreenX - halfSize,
-    castleScreenY - halfSize + CASTLE_CONFIG.TOWER_SIZE,
-    CASTLE_CONFIG.WALL_THICKNESS,
-    CASTLE_CONFIG.CASTLE_SIZE - CASTLE_CONFIG.TOWER_SIZE * 2
+    castleScreenY - halfSize + towerSize,
+    wallThickness,
+    CASTLE_CONFIG.CASTLE_SIZE - towerSize * 2
   );
   ctx.strokeRect(
     castleScreenX - halfSize,
-    castleScreenY - halfSize + CASTLE_CONFIG.TOWER_SIZE,
-    CASTLE_CONFIG.WALL_THICKNESS,
-    CASTLE_CONFIG.CASTLE_SIZE - CASTLE_CONFIG.TOWER_SIZE * 2
+    castleScreenY - halfSize + towerSize,
+    wallThickness,
+    CASTLE_CONFIG.CASTLE_SIZE - towerSize * 2
   );
   
   // Right wall
   ctx.fillRect(
-    castleScreenX + halfSize - CASTLE_CONFIG.WALL_THICKNESS,
-    castleScreenY - halfSize + CASTLE_CONFIG.TOWER_SIZE,
-    CASTLE_CONFIG.WALL_THICKNESS,
-    CASTLE_CONFIG.CASTLE_SIZE - CASTLE_CONFIG.TOWER_SIZE * 2
+    castleScreenX + halfSize - wallThickness,
+    castleScreenY - halfSize + towerSize,
+    wallThickness,
+    CASTLE_CONFIG.CASTLE_SIZE - towerSize * 2
   );
   ctx.strokeRect(
-    castleScreenX + halfSize - CASTLE_CONFIG.WALL_THICKNESS,
-    castleScreenY - halfSize + CASTLE_CONFIG.TOWER_SIZE,
-    CASTLE_CONFIG.WALL_THICKNESS,
-    CASTLE_CONFIG.CASTLE_SIZE - CASTLE_CONFIG.TOWER_SIZE * 2
+    castleScreenX + halfSize - wallThickness,
+    castleScreenY - halfSize + towerSize,
+    wallThickness,
+    CASTLE_CONFIG.CASTLE_SIZE - towerSize * 2
   );
 }
 
-// Draw a single tower (pointed roof visible from outside, wood floor from inside)
+// Draw a single tower (pointed roof visible from outside)
 function drawTower(screenX, screenY) {
   const towerSize = CASTLE_CONFIG.TOWER_SIZE;
   
   // Tower base (stone)
   ctx.fillStyle = '#8B7355';
-  ctx.fillRect(
-    screenX - towerSize / 2,
-    screenY - towerSize / 2,
-    towerSize,
-    towerSize
-  );
+  ctx.fillRect(screenX, screenY, towerSize, towerSize);
   
   // Tower outline
   ctx.strokeStyle = '#5C4A42';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(
-    screenX - towerSize / 2,
-    screenY - towerSize / 2,
-    towerSize,
-    towerSize
-  );
+  ctx.lineWidth = 3;
+  ctx.strokeRect(screenX, screenY, towerSize, towerSize);
   
   // Pointed roof (always visible, points upward)
   ctx.fillStyle = '#CD5C5C';
   ctx.beginPath();
-  ctx.moveTo(screenX - towerSize / 2, screenY - towerSize / 2); // Top-left
-  ctx.lineTo(screenX + towerSize / 2, screenY - towerSize / 2); // Top-right
-  ctx.lineTo(screenX, screenY - towerSize); // Peak point
+  ctx.moveTo(screenX, screenY); // Top-left
+  ctx.lineTo(screenX + towerSize, screenY); // Top-right
+  ctx.lineTo(screenX + towerSize / 2, screenY - towerSize * 0.8); // Peak point
   ctx.closePath();
   ctx.fill();
   
   // Roof outline
   ctx.strokeStyle = '#8B3A3A';
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = 2;
   ctx.stroke();
   
-  // Add some castle details (crenellations)
-  const crenelSize = towerSize / 5;
+  // Add crenellations (castle teeth)
+  const crenelSize = towerSize / 6;
   ctx.fillStyle = '#5C4A42';
-  ctx.fillRect(screenX - towerSize / 2, screenY - towerSize / 2 - crenelSize, crenelSize, crenelSize);
-  ctx.fillRect(screenX + towerSize / 2 - crenelSize, screenY - towerSize / 2 - crenelSize, crenelSize, crenelSize);
+  ctx.fillRect(screenX, screenY - crenelSize, crenelSize, crenelSize);
+  ctx.fillRect(screenX + towerSize - crenelSize, screenY - crenelSize, crenelSize, crenelSize);
+  ctx.fillRect(screenX + towerSize / 3, screenY - crenelSize, crenelSize, crenelSize);
+  ctx.fillRect(screenX + towerSize * 2 / 3, screenY - crenelSize, crenelSize, crenelSize);
 }
 
 // Draw player character (top-down with wizard hat)
@@ -448,48 +452,63 @@ function updateCamera() {
 function updateLocalPlayerMovement(deltaTime) {
   if (!gameState.localPlayer) return;
 
+  const dt = deltaTime / 1000; // Convert to seconds
+
   // Calculate target velocity based on input
   gameState.targetVelocity.x = 0;
   gameState.targetVelocity.y = 0;
 
+  const maxSpeed = 200; // pixels per second
+
   if (gameState.keys['w'] || gameState.keys['W']) {
-    gameState.targetVelocity.y -= MOVEMENT_CONFIG.MAX_SPEED;
+    gameState.targetVelocity.y = -maxSpeed;
   }
   if (gameState.keys['s'] || gameState.keys['S']) {
-    gameState.targetVelocity.y += MOVEMENT_CONFIG.MAX_SPEED;
+    gameState.targetVelocity.y = maxSpeed;
   }
   if (gameState.keys['a'] || gameState.keys['A']) {
-    gameState.targetVelocity.x -= MOVEMENT_CONFIG.MAX_SPEED;
+    gameState.targetVelocity.x = -maxSpeed;
   }
   if (gameState.keys['d'] || gameState.keys['D']) {
-    gameState.targetVelocity.x += MOVEMENT_CONFIG.MAX_SPEED;
+    gameState.targetVelocity.x = maxSpeed;
   }
 
-  // Normalize diagonal movement
-  const targetMagnitude = Math.sqrt(gameState.targetVelocity.x ** 2 + gameState.targetVelocity.y ** 2);
-  if (targetMagnitude > MOVEMENT_CONFIG.MAX_SPEED) {
-    gameState.targetVelocity.x = (gameState.targetVelocity.x / targetMagnitude) * MOVEMENT_CONFIG.MAX_SPEED;
-    gameState.targetVelocity.y = (gameState.targetVelocity.y / targetMagnitude) * MOVEMENT_CONFIG.MAX_SPEED;
+  // Handle diagonal input (both W and D pressed, for example)
+  if ((gameState.keys['w'] || gameState.keys['W']) && (gameState.keys['a'] || gameState.keys['A'])) {
+    gameState.targetVelocity.x = -maxSpeed / Math.sqrt(2);
+    gameState.targetVelocity.y = -maxSpeed / Math.sqrt(2);
+  }
+  if ((gameState.keys['w'] || gameState.keys['W']) && (gameState.keys['d'] || gameState.keys['D'])) {
+    gameState.targetVelocity.x = maxSpeed / Math.sqrt(2);
+    gameState.targetVelocity.y = -maxSpeed / Math.sqrt(2);
+  }
+  if ((gameState.keys['s'] || gameState.keys['S']) && (gameState.keys['a'] || gameState.keys['A'])) {
+    gameState.targetVelocity.x = -maxSpeed / Math.sqrt(2);
+    gameState.targetVelocity.y = maxSpeed / Math.sqrt(2);
+  }
+  if ((gameState.keys['s'] || gameState.keys['S']) && (gameState.keys['d'] || gameState.keys['D'])) {
+    gameState.targetVelocity.x = maxSpeed / Math.sqrt(2);
+    gameState.targetVelocity.y = maxSpeed / Math.sqrt(2);
   }
 
-  // Smooth acceleration/deceleration
+  // Smooth acceleration and deceleration
   const isMoving = gameState.targetVelocity.x !== 0 || gameState.targetVelocity.y !== 0;
-  const accel = isMoving ? MOVEMENT_CONFIG.ACCELERATION : MOVEMENT_CONFIG.DECELERATION;
+  const accelFactor = isMoving ? 0.2 : 0.15; // Slightly slower acceleration for smoothness
 
-  gameState.velocity.x += (gameState.targetVelocity.x - gameState.velocity.x) * accel;
-  gameState.velocity.y += (gameState.targetVelocity.y - gameState.velocity.y) * accel;
+  gameState.velocity.x += (gameState.targetVelocity.x - gameState.velocity.x) * accelFactor;
+  gameState.velocity.y += (gameState.targetVelocity.y - gameState.velocity.y) * accelFactor;
 
-  // Apply friction for smooth gliding
-  gameState.velocity.x *= MOVEMENT_CONFIG.FRICTION;
-  gameState.velocity.y *= MOVEMENT_CONFIG.FRICTION;
+  // Apply friction
+  gameState.velocity.x *= 0.95;
+  gameState.velocity.y *= 0.95;
 
   // Stop if velocity is very small
-  if (Math.abs(gameState.velocity.x) < 0.5) gameState.velocity.x = 0;
-  if (Math.abs(gameState.velocity.y) < 0.5) gameState.velocity.y = 0;
+  if (Math.abs(gameState.velocity.x) < 0.1) gameState.velocity.x = 0;
+  if (Math.abs(gameState.velocity.y) < 0.1) gameState.velocity.y = 0;
 
-  // Update position based on deltaTime for frame-rate independent movement
-  gameState.localPlayer.x += gameState.velocity.x * (deltaTime / 1000);
-  gameState.localPlayer.y += gameState.velocity.y * (deltaTime / 1000);
+  // Update position
+  gameState.localPlayer.x += gameState.velocity.x * dt;
+  gameState.localPlayer.y += gameState.velocity.y * dt;
 
   // Clamp to map bounds
   gameState.localPlayer.x = Math.max(GAME_CONFIG.PLAYER_RADIUS, Math.min(GAME_CONFIG.MAP_WIDTH - GAME_CONFIG.PLAYER_RADIUS, gameState.localPlayer.x));
@@ -533,7 +552,7 @@ function gameLoop() {
   updateLocalPlayerMovement(dt);
   updateCamera();
 
-  // Draw castle (exterior or interior based on player position)
+  // Draw castle (interior or exterior based on player position)
   if (gameState.isPlayerInCastle) {
     drawCastleInterior();
   } else {
@@ -593,7 +612,9 @@ function connectWebSocket() {
           characterName: message.characterName,
           x: message.x,
           y: message.y,
-          avatar: message.avatar
+          avatar: message.avatar,
+          vx: 0,
+          vy: 0
         });
       } else if (message.type === 'playerLeft') {
         gameState.otherPlayers.delete(message.playerId);
@@ -601,9 +622,18 @@ function connectWebSocket() {
         if (Array.isArray(message.players)) {
           message.players.forEach((p) => {
             if (p.id === currentUser.id) {
+              // Don't update local player from server for smoother movement
+              // Only use for position correction if drift detected
               if (gameState.localPlayer) {
-                gameState.localPlayer.x = p.x;
-                gameState.localPlayer.y = p.y;
+                const dx = Math.abs(p.x - gameState.localPlayer.x);
+                const dy = Math.abs(p.y - gameState.localPlayer.y);
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                // Only correct if significant drift (>50 pixels)
+                if (distance > 50) {
+                  gameState.localPlayer.x = p.x;
+                  gameState.localPlayer.y = p.y;
+                }
               }
             } else {
               const existing = gameState.otherPlayers.get(p.id);
