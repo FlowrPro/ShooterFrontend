@@ -122,26 +122,6 @@ function renderRightPanel() {
           <p class="text-sm text-gray-300">Daily Quests - Coming Soon</p>
         </div>
       </div>
-      <div>
-        <div class="font-bold mb-3 text-lg">🎮 Game Mode</div>
-        <div class="flex gap-2">
-          <button class="flex-1 bg-purple-600 hover:bg-purple-500 py-2 rounded font-bold text-sm transition center-btn" data-modal="create-game">Create</button>
-          <button class="flex-1 bg-blue-600 hover:bg-blue-500 py-2 rounded font-bold text-sm transition center-btn" data-modal="join-game">Join</button>
-        </div>
-      </div>
-      <button id="quickMatchBtn" class="w-full bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-300 hover:to-yellow-400 py-3 rounded-lg text-lg font-black text-black shadow-lg transition transform hover:scale-105 center-btn" data-modal="quick-match">
-        🚀 QUICK MATCH
-      </button>
-      <div>
-        <div class="font-bold mb-2 text-sm">🌍 Region</div>
-        <div class="bg-gray-800 bg-opacity-50 rounded p-2">
-          <select class="w-full bg-gray-900 text-white px-2 py-1 rounded text-sm">
-            <option>🌍 North America</option>
-            <option>🌍 Europe</option>
-            <option>🌍 Asia</option>
-          </select>
-        </div>
-      </div>
       <div class="mt-auto text-xs text-gray-500 border-t border-purple-400 border-opacity-30 pt-3">
         <p>© 2026 Moborr.io</p>
         <a href="#" class="text-blue-400 hover:text-blue-300">Terms</a> • 
