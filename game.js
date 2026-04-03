@@ -210,17 +210,9 @@ function drawMinimap() {
   const minimapX = GAME_CONFIG.CANVAS_WIDTH - MINIMAP_CONFIG.WIDTH - 10;
   const minimapY = 10;
 
-  // Draw minimap with ground texture
-  if (gameState.groundTexture) {
-    const pattern = ctx.createPattern(gameState.groundTexture, 'repeat');
-    ctx.save();
-    ctx.fillStyle = pattern;
-    ctx.fillRect(minimapX, minimapY, MINIMAP_CONFIG.WIDTH, MINIMAP_CONFIG.HEIGHT);
-    ctx.restore();
-  } else {
-    ctx.fillStyle = '#26a55f';
-    ctx.fillRect(minimapX, minimapY, MINIMAP_CONFIG.WIDTH, MINIMAP_CONFIG.HEIGHT);
-  }
+  // Draw solid grey background (no texture)
+  ctx.fillStyle = '#404040';
+  ctx.fillRect(minimapX, minimapY, MINIMAP_CONFIG.WIDTH, MINIMAP_CONFIG.HEIGHT);
 
   // Border
   ctx.strokeStyle = '#22c55e';
