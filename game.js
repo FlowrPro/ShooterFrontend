@@ -49,25 +49,28 @@ function resizeCanvas() {
   GAME_CONFIG.CANVAS_HEIGHT = canvas.height;
 }
 
-// Draw a player character (top-down style with circle face, eyes, smile, and arms)
+// Draw a player character (hordes.io/devast.io style with wider arms)
 function drawPlayerCharacter(screenX, screenY, isLocal = false) {
   const radius = GAME_CONFIG.PLAYER_RADIUS;
   
-  // Draw arms on the sides
-  ctx.strokeStyle = isLocal ? '#86efac' : '#4ade80';
-  ctx.lineWidth = 4;
-  ctx.lineCap = 'round';
-  
-  // Left arm
+  // Draw left arm (wider, more body-like)
+  ctx.fillStyle = isLocal ? '#86efac' : '#4ade80';
   ctx.beginPath();
-  ctx.moveTo(screenX - radius * 0.6, screenY - radius * 0.3);
-  ctx.lineTo(screenX - radius * 1.3, screenY - radius * 0.2);
+  ctx.ellipse(screenX - radius * 0.75, screenY, radius * 0.5, radius * 0.35, 0, 0, Math.PI * 2);
+  ctx.fill();
+  
+  ctx.strokeStyle = '#15803d';
+  ctx.lineWidth = 1.5;
   ctx.stroke();
   
-  // Right arm
+  // Draw right arm (wider, more body-like)
+  ctx.fillStyle = isLocal ? '#86efac' : '#4ade80';
   ctx.beginPath();
-  ctx.moveTo(screenX + radius * 0.6, screenY - radius * 0.3);
-  ctx.lineTo(screenX + radius * 1.3, screenY - radius * 0.2);
+  ctx.ellipse(screenX + radius * 0.75, screenY, radius * 0.5, radius * 0.35, 0, 0, Math.PI * 2);
+  ctx.fill();
+  
+  ctx.strokeStyle = '#15803d';
+  ctx.lineWidth = 1.5;
   ctx.stroke();
   
   // Draw main circle head
