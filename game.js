@@ -10,7 +10,7 @@ const GAME_CONFIG = {
   MAP_WIDTH: 50000,
   MAP_HEIGHT: 50000,
   PLAYER_RADIUS: 25,
-  GRASS_TILE_SIZE: 50
+  GRASS_TILE_SIZE: 128
 };
 
 const MINIMAP_CONFIG = {
@@ -36,7 +36,7 @@ let gameState = {
   acceleration: 0.15,
   maxSpeed: 3,
   friction: 0.88,
-  playerTexture: null
+  groundTexture: null
 };
 
 const canvas = document.getElementById('gameCanvas');
@@ -47,6 +47,40 @@ function resizeCanvas() {
   canvas.height = window.innerHeight;
   GAME_CONFIG.CANVAS_WIDTH = canvas.width;
   GAME_CONFIG.CANVAS_HEIGHT = canvas.height;
+}
+
+// Load ground texture
+function loadGroundTexture() {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      gameState.groundTexture = img;
+      console.log('✅ Ground texture loaded');
+      resolve(img);
+    };
+    img.onerror = () => {
+      console.warn('Failed to load ground texture, will use fallback');
+      resolve(null);
+    };
+    img.src = './assets/ground-texture.png';
+  });
+}
+
+// Draw ground using texture
+function drawGrassyGround() {
+  if (gameState.groundTexture) {
+    // Use texture pattern
+    const pattern = ctx.createPattern(gameState.groundTexture, 'repeat');
+    ctx.save();
+    ctx.translate(-gameState.camera.x, -gameState.camera.y);
+    ctx.fillStyle = pattern;
+    ctx.fillRect(gameState.camera.x, gameState.camera.y, GAME_CONFIG.CANVAS_WIDTH, GAME_CONFIG.CANVAS_HEIGHT);
+    ctx.restore();
+  } else {
+    // Fallback: solid color if texture fails to load
+    ctx.fillStyle = '#26a55f';
+    ctx.fillRect(0, 0, GAME_CONFIG.CANVAS_WIDTH, GAME_CONFIG.CANVAS_HEIGHT);
+  }
 }
 
 // Draw a player character (top-down with wizard hat)
@@ -144,70 +178,6 @@ function drawStar(cx, cy, spikes, outerRadius, innerRadius, color) {
   ctx.stroke();
 }
 
-// Procedural grass texture using seeded random
-function seededRandom(seed) {
-  const x = Math.sin(seed++) * 10000;
-  return x - Math.floor(x);
-}
-
-function getTerrainColor(x, y) {
-  const tileX = x / GAME_CONFIG.GRASS_TILE_SIZE;
-  const tileY = y / GAME_CONFIG.GRASS_TILE_SIZE;
-  const seed = tileX * 73856093 ^ tileY * 19349663;
-  const rand = seededRandom(seed);
-
-  if (rand < 0.3) {
-    return '#2d5016';
-  } else if (rand < 0.6) {
-    return '#3d6b1f';
-  } else {
-    return '#2f4a13';
-  }
-}
-
-function drawGrassyGround() {
-  const startX = Math.floor(gameState.camera.x / GAME_CONFIG.GRASS_TILE_SIZE) * GAME_CONFIG.GRASS_TILE_SIZE;
-  const startY = Math.floor(gameState.camera.y / GAME_CONFIG.GRASS_TILE_SIZE) * GAME_CONFIG.GRASS_TILE_SIZE;
-
-  for (let x = startX; x < gameState.camera.x + GAME_CONFIG.CANVAS_WIDTH; x += GAME_CONFIG.GRASS_TILE_SIZE) {
-    for (let y = startY; y < gameState.camera.y + GAME_CONFIG.CANVAS_HEIGHT; y += GAME_CONFIG.GRASS_TILE_SIZE) {
-      ctx.fillStyle = getTerrainColor(x, y);
-      const screenX = x - gameState.camera.x;
-      const screenY = y - gameState.camera.y;
-      ctx.fillRect(screenX, screenY, GAME_CONFIG.GRASS_TILE_SIZE, GAME_CONFIG.GRASS_TILE_SIZE);
-
-      // Add subtle grass texture details
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
-      const tileX = x / GAME_CONFIG.GRASS_TILE_SIZE;
-      const tileY = y / GAME_CONFIG.GRASS_TILE_SIZE;
-      const seed = tileX * 73856093 ^ tileY * 19349663;
-      for (let i = 0; i < 3; i++) {
-        const detailX = screenX + seededRandom(seed + i) * GAME_CONFIG.GRASS_TILE_SIZE;
-        const detailY = screenY + seededRandom(seed + i + 100) * GAME_CONFIG.GRASS_TILE_SIZE;
-        ctx.fillRect(detailX, detailY, 2, 2);
-      }
-    }
-  }
-
-  // Draw grid lines
-  ctx.strokeStyle = 'rgba(0, 100, 0, 0.08)';
-  ctx.lineWidth = 1;
-  for (let x = startX; x < gameState.camera.x + GAME_CONFIG.CANVAS_WIDTH; x += GAME_CONFIG.GRASS_TILE_SIZE) {
-    const screenX = x - gameState.camera.x;
-    ctx.beginPath();
-    ctx.moveTo(screenX, 0);
-    ctx.lineTo(screenX, GAME_CONFIG.CANVAS_HEIGHT);
-    ctx.stroke();
-  }
-  for (let y = startY; y < gameState.camera.y + GAME_CONFIG.CANVAS_HEIGHT; y += GAME_CONFIG.GRASS_TILE_SIZE) {
-    const screenY = y - gameState.camera.y;
-    ctx.beginPath();
-    ctx.moveTo(0, screenY);
-    ctx.lineTo(GAME_CONFIG.CANVAS_WIDTH, screenY);
-    ctx.stroke();
-  }
-}
-
 function drawPlayer(player, isLocal = false) {
   const screenX = player.x - gameState.camera.x;
   const screenY = player.y - gameState.camera.y;
@@ -240,16 +210,16 @@ function drawMinimap() {
   const minimapX = GAME_CONFIG.CANVAS_WIDTH - MINIMAP_CONFIG.WIDTH - 10;
   const minimapY = 10;
 
-  // Draw minimap terrain
-  for (let px = 0; px < MINIMAP_CONFIG.WIDTH; px += MINIMAP_CONFIG.GRASS_TILE_SIZE) {
-    for (let py = 0; py < MINIMAP_CONFIG.HEIGHT; py += MINIMAP_CONFIG.GRASS_TILE_SIZE) {
-      const worldX = (px / MINIMAP_CONFIG.WIDTH) * GAME_CONFIG.MAP_WIDTH;
-      const worldY = (py / MINIMAP_CONFIG.HEIGHT) * GAME_CONFIG.MAP_HEIGHT;
-      const color = getTerrainColor(worldX, worldY);
-
-      ctx.fillStyle = color;
-      ctx.fillRect(minimapX + px, minimapY + py, MINIMAP_CONFIG.GRASS_TILE_SIZE, MINIMAP_CONFIG.GRASS_TILE_SIZE);
-    }
+  // Draw minimap with ground texture
+  if (gameState.groundTexture) {
+    const pattern = ctx.createPattern(gameState.groundTexture, 'repeat');
+    ctx.save();
+    ctx.fillStyle = pattern;
+    ctx.fillRect(minimapX, minimapY, MINIMAP_CONFIG.WIDTH, MINIMAP_CONFIG.HEIGHT);
+    ctx.restore();
+  } else {
+    ctx.fillStyle = '#26a55f';
+    ctx.fillRect(minimapX, minimapY, MINIMAP_CONFIG.WIDTH, MINIMAP_CONFIG.HEIGHT);
   }
 
   // Border
@@ -501,6 +471,9 @@ export async function initializeGame() {
   }
 
   gameState.selectedCharacter = JSON.parse(selectedChar);
+
+  // Load ground texture before starting game
+  await loadGroundTexture();
 
   resizeCanvas();
   setupKeyboardInput();
