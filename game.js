@@ -24,10 +24,20 @@ const MINIMAP_CONFIG = {
 
 // Movement smoothing constants
 const MOVEMENT_CONFIG = {
-  MAX_SPEED: 200, // pixels per second
-  ACCELERATION: 0.15, // 0-1, higher = faster acceleration
-  DECELERATION: 0.25, // 0-1, higher = faster deceleration
-  FRICTION: 0.92 // 0-1, applied every frame for smooth gliding
+  MAX_SPEED: 200,
+  ACCELERATION: 0.15,
+  DECELERATION: 0.25,
+  FRICTION: 0.92
+};
+
+// Castle configuration
+const CASTLE_CONFIG = {
+  CENTER_X: 25000,
+  CENTER_Y: 25000,
+  CASTLE_SIZE: 800, // Width/height of castle
+  TOWER_SIZE: 150, // Size of each tower
+  WALL_THICKNESS: 40,
+  INNER_RADIUS: 400 // Radius to determine if player is inside
 };
 
 let gameState = {
@@ -37,13 +47,14 @@ let gameState = {
   keys: {},
   ws: null,
   lastInputTime: 0,
-  inputDelay: 33, // ~30fps for input updates to server
+  inputDelay: 33,
   selectedCharacter: null,
   velocity: { x: 0, y: 0 },
   targetVelocity: { x: 0, y: 0 },
   groundTexture: null,
   lastFrameTime: Date.now(),
-  deltaTime: 0
+  deltaTime: 0,
+  isPlayerInCastle: false
 };
 
 const canvas = document.getElementById('gameCanvas');
@@ -73,6 +84,14 @@ function loadGroundTexture() {
   });
 }
 
+// Check if player is inside castle
+function isPlayerInsideCastle(x, y) {
+  const dx = x - CASTLE_CONFIG.CENTER_X;
+  const dy = y - CASTLE_CONFIG.CENTER_Y;
+  const distance = Math.sqrt(dx * dx + dy * dy);
+  return distance < CASTLE_CONFIG.INNER_RADIUS;
+}
+
 // Draw ground using texture
 function drawGrassyGround() {
   if (gameState.groundTexture) {
@@ -88,7 +107,163 @@ function drawGrassyGround() {
   }
 }
 
-// Draw a player character (top-down with wizard hat)
+// Draw castle interior (wood floor, viewed from above inside)
+function drawCastleInterior() {
+  const castleScreenX = CASTLE_CONFIG.CENTER_X - gameState.camera.x;
+  const castleScreenY = CASTLE_CONFIG.CENTER_Y - gameState.camera.y;
+  
+  // Wood floor with planks
+  ctx.fillStyle = '#8B6F47';
+  ctx.beginPath();
+  ctx.arc(castleScreenX, castleScreenY, CASTLE_CONFIG.INNER_RADIUS, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // Add wood plank details
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
+  ctx.lineWidth = 2;
+  for (let i = -CASTLE_CONFIG.INNER_RADIUS; i < CASTLE_CONFIG.INNER_RADIUS; i += 30) {
+    ctx.beginPath();
+    ctx.moveTo(castleScreenX + i, castleScreenY - CASTLE_CONFIG.INNER_RADIUS);
+    ctx.lineTo(castleScreenX + i, castleScreenY + CASTLE_CONFIG.INNER_RADIUS);
+    ctx.stroke();
+  }
+  
+  // Inner circle highlight (roof edges visible from inside)
+  ctx.strokeStyle = 'rgba(139, 111, 71, 0.6)';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(castleScreenX, castleScreenY, CASTLE_CONFIG.INNER_RADIUS - 10, 0, Math.PI * 2);
+  ctx.stroke();
+}
+
+// Draw castle exterior (proper castle with towers)
+function drawCastleExterior() {
+  const castleScreenX = CASTLE_CONFIG.CENTER_X - gameState.camera.x;
+  const castleScreenY = CASTLE_CONFIG.CENTER_Y - gameState.camera.y;
+  const halfSize = CASTLE_CONFIG.CASTLE_SIZE / 2;
+  
+  // Draw 4 towers at corners
+  const towers = [
+    { x: -halfSize, y: -halfSize }, // Top-left
+    { x: halfSize, y: -halfSize },  // Top-right
+    { x: halfSize, y: halfSize },   // Bottom-right
+    { x: -halfSize, y: halfSize }   // Bottom-left
+  ];
+  
+  towers.forEach((tower) => {
+    drawTower(
+      castleScreenX + tower.x,
+      castleScreenY + tower.y
+    );
+  });
+  
+  // Draw castle walls between towers
+  ctx.fillStyle = '#A0826D';
+  ctx.strokeStyle = '#6B5D52';
+  ctx.lineWidth = 2;
+  
+  // Top wall
+  ctx.fillRect(
+    castleScreenX - halfSize + CASTLE_CONFIG.TOWER_SIZE,
+    castleScreenY - halfSize,
+    CASTLE_CONFIG.CASTLE_SIZE - CASTLE_CONFIG.TOWER_SIZE * 2,
+    CASTLE_CONFIG.WALL_THICKNESS
+  );
+  ctx.strokeRect(
+    castleScreenX - halfSize + CASTLE_CONFIG.TOWER_SIZE,
+    castleScreenY - halfSize,
+    CASTLE_CONFIG.CASTLE_SIZE - CASTLE_CONFIG.TOWER_SIZE * 2,
+    CASTLE_CONFIG.WALL_THICKNESS
+  );
+  
+  // Bottom wall
+  ctx.fillRect(
+    castleScreenX - halfSize + CASTLE_CONFIG.TOWER_SIZE,
+    castleScreenY + halfSize - CASTLE_CONFIG.WALL_THICKNESS,
+    CASTLE_CONFIG.CASTLE_SIZE - CASTLE_CONFIG.TOWER_SIZE * 2,
+    CASTLE_CONFIG.WALL_THICKNESS
+  );
+  ctx.strokeRect(
+    castleScreenX - halfSize + CASTLE_CONFIG.TOWER_SIZE,
+    castleScreenY + halfSize - CASTLE_CONFIG.WALL_THICKNESS,
+    CASTLE_CONFIG.CASTLE_SIZE - CASTLE_CONFIG.TOWER_SIZE * 2,
+    CASTLE_CONFIG.WALL_THICKNESS
+  );
+  
+  // Left wall
+  ctx.fillRect(
+    castleScreenX - halfSize,
+    castleScreenY - halfSize + CASTLE_CONFIG.TOWER_SIZE,
+    CASTLE_CONFIG.WALL_THICKNESS,
+    CASTLE_CONFIG.CASTLE_SIZE - CASTLE_CONFIG.TOWER_SIZE * 2
+  );
+  ctx.strokeRect(
+    castleScreenX - halfSize,
+    castleScreenY - halfSize + CASTLE_CONFIG.TOWER_SIZE,
+    CASTLE_CONFIG.WALL_THICKNESS,
+    CASTLE_CONFIG.CASTLE_SIZE - CASTLE_CONFIG.TOWER_SIZE * 2
+  );
+  
+  // Right wall
+  ctx.fillRect(
+    castleScreenX + halfSize - CASTLE_CONFIG.WALL_THICKNESS,
+    castleScreenY - halfSize + CASTLE_CONFIG.TOWER_SIZE,
+    CASTLE_CONFIG.WALL_THICKNESS,
+    CASTLE_CONFIG.CASTLE_SIZE - CASTLE_CONFIG.TOWER_SIZE * 2
+  );
+  ctx.strokeRect(
+    castleScreenX + halfSize - CASTLE_CONFIG.WALL_THICKNESS,
+    castleScreenY - halfSize + CASTLE_CONFIG.TOWER_SIZE,
+    CASTLE_CONFIG.WALL_THICKNESS,
+    CASTLE_CONFIG.CASTLE_SIZE - CASTLE_CONFIG.TOWER_SIZE * 2
+  );
+}
+
+// Draw a single tower (pointed roof visible from outside, wood floor from inside)
+function drawTower(screenX, screenY) {
+  const towerSize = CASTLE_CONFIG.TOWER_SIZE;
+  
+  // Tower base (stone)
+  ctx.fillStyle = '#8B7355';
+  ctx.fillRect(
+    screenX - towerSize / 2,
+    screenY - towerSize / 2,
+    towerSize,
+    towerSize
+  );
+  
+  // Tower outline
+  ctx.strokeStyle = '#5C4A42';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(
+    screenX - towerSize / 2,
+    screenY - towerSize / 2,
+    towerSize,
+    towerSize
+  );
+  
+  // Pointed roof (always visible, points upward)
+  ctx.fillStyle = '#CD5C5C';
+  ctx.beginPath();
+  ctx.moveTo(screenX - towerSize / 2, screenY - towerSize / 2); // Top-left
+  ctx.lineTo(screenX + towerSize / 2, screenY - towerSize / 2); // Top-right
+  ctx.lineTo(screenX, screenY - towerSize); // Peak point
+  ctx.closePath();
+  ctx.fill();
+  
+  // Roof outline
+  ctx.strokeStyle = '#8B3A3A';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  
+  // Add some castle details (crenellations)
+  const crenelSize = towerSize / 5;
+  ctx.fillStyle = '#5C4A42';
+  ctx.fillRect(screenX - towerSize / 2, screenY - towerSize / 2 - crenelSize, crenelSize, crenelSize);
+  ctx.fillRect(screenX + towerSize / 2 - crenelSize, screenY - towerSize / 2 - crenelSize, crenelSize, crenelSize);
+}
+
+// Draw player character (top-down with wizard hat)
 function drawPlayerCharacter(screenX, screenY, isLocal = false) {
   const radius = GAME_CONFIG.PLAYER_RADIUS;
   
@@ -213,6 +388,19 @@ function drawMinimap() {
   ctx.fillStyle = '#404040';
   ctx.fillRect(minimapX, minimapY, MINIMAP_CONFIG.WIDTH, MINIMAP_CONFIG.HEIGHT);
 
+  // Draw castle on minimap
+  const castleMinimapX = minimapX + (CASTLE_CONFIG.CENTER_X / GAME_CONFIG.MAP_WIDTH) * MINIMAP_CONFIG.WIDTH;
+  const castleMinimapY = minimapY + (CASTLE_CONFIG.CENTER_Y / GAME_CONFIG.MAP_HEIGHT) * MINIMAP_CONFIG.HEIGHT;
+  const castleMinimapSize = (CASTLE_CONFIG.CASTLE_SIZE / GAME_CONFIG.MAP_WIDTH) * MINIMAP_CONFIG.WIDTH;
+  
+  ctx.fillStyle = '#8B4513';
+  ctx.fillRect(
+    castleMinimapX - castleMinimapSize / 2,
+    castleMinimapY - castleMinimapSize / 2,
+    castleMinimapSize,
+    castleMinimapSize
+  );
+
   ctx.strokeStyle = '#22c55e';
   ctx.lineWidth = 2;
   ctx.strokeRect(minimapX, minimapY, MINIMAP_CONFIG.WIDTH, MINIMAP_CONFIG.HEIGHT);
@@ -306,6 +494,9 @@ function updateLocalPlayerMovement(deltaTime) {
   // Clamp to map bounds
   gameState.localPlayer.x = Math.max(GAME_CONFIG.PLAYER_RADIUS, Math.min(GAME_CONFIG.MAP_WIDTH - GAME_CONFIG.PLAYER_RADIUS, gameState.localPlayer.x));
   gameState.localPlayer.y = Math.max(GAME_CONFIG.PLAYER_RADIUS, Math.min(GAME_CONFIG.MAP_HEIGHT - GAME_CONFIG.PLAYER_RADIUS, gameState.localPlayer.y));
+
+  // Update castle inside/outside state
+  gameState.isPlayerInCastle = isPlayerInsideCastle(gameState.localPlayer.x, gameState.localPlayer.y);
 }
 
 function sendInputToServer() {
@@ -333,7 +524,6 @@ function gameLoop() {
   gameState.deltaTime = now - gameState.lastFrameTime;
   gameState.lastFrameTime = now;
 
-  // Cap deltaTime to prevent huge jumps
   const dt = Math.min(gameState.deltaTime, 50);
 
   ctx.fillStyle = '#1a1a1a';
@@ -342,6 +532,13 @@ function gameLoop() {
   drawGrassyGround();
   updateLocalPlayerMovement(dt);
   updateCamera();
+
+  // Draw castle (exterior or interior based on player position)
+  if (gameState.isPlayerInCastle) {
+    drawCastleInterior();
+  } else {
+    drawCastleExterior();
+  }
 
   if (gameState.localPlayer) {
     drawPlayer(gameState.localPlayer, true);
