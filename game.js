@@ -49,20 +49,66 @@ function resizeCanvas() {
   GAME_CONFIG.CANVAS_HEIGHT = canvas.height;
 }
 
-// Load player texture
-function loadPlayerTexture() {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => {
-      gameState.playerTexture = img;
-      resolve(img);
-    };
-    img.onerror = () => {
-      console.warn('Failed to load defaultplayer.png, will use fallback rendering');
-      resolve(null);
-    };
-    img.src = './assets/defaultplayer.png';
-  });
+// Draw a player character (top-down style with circle face, eyes, smile, and arms)
+function drawPlayerCharacter(screenX, screenY, isLocal = false) {
+  const radius = GAME_CONFIG.PLAYER_RADIUS;
+  
+  // Draw arms on the sides
+  ctx.strokeStyle = isLocal ? '#86efac' : '#4ade80';
+  ctx.lineWidth = 4;
+  ctx.lineCap = 'round';
+  
+  // Left arm
+  ctx.beginPath();
+  ctx.moveTo(screenX - radius * 0.6, screenY - radius * 0.3);
+  ctx.lineTo(screenX - radius * 1.3, screenY - radius * 0.2);
+  ctx.stroke();
+  
+  // Right arm
+  ctx.beginPath();
+  ctx.moveTo(screenX + radius * 0.6, screenY - radius * 0.3);
+  ctx.lineTo(screenX + radius * 1.3, screenY - radius * 0.2);
+  ctx.stroke();
+  
+  // Draw main circle head
+  ctx.fillStyle = isLocal ? '#22c55e' : '#16a34a';
+  ctx.beginPath();
+  ctx.arc(screenX, screenY, radius, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // Draw outline
+  ctx.strokeStyle = '#15803d';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  
+  // Draw left eye
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.arc(screenX - radius * 0.35, screenY - radius * 0.25, radius * 0.2, 0, Math.PI * 2);
+  ctx.fill();
+  
+  ctx.fillStyle = '#000000';
+  ctx.beginPath();
+  ctx.arc(screenX - radius * 0.35, screenY - radius * 0.25, radius * 0.1, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // Draw right eye
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.arc(screenX + radius * 0.35, screenY - radius * 0.25, radius * 0.2, 0, Math.PI * 2);
+  ctx.fill();
+  
+  ctx.fillStyle = '#000000';
+  ctx.beginPath();
+  ctx.arc(screenX + radius * 0.35, screenY - radius * 0.25, radius * 0.1, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // Draw smile (arc)
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(screenX, screenY + radius * 0.15, radius * 0.25, 0, Math.PI, false);
+  ctx.stroke();
 }
 
 // Procedural grass texture using seeded random
@@ -138,48 +184,8 @@ function drawPlayer(player, isLocal = false) {
     return;
   }
 
-  // Draw player texture or fallback
-  if (gameState.playerTexture) {
-    ctx.save();
-    ctx.globalAlpha = 1.0;
-    ctx.drawImage(
-      gameState.playerTexture,
-      screenX - GAME_CONFIG.PLAYER_RADIUS,
-      screenY - GAME_CONFIG.PLAYER_RADIUS,
-      GAME_CONFIG.PLAYER_RADIUS * 2,
-      GAME_CONFIG.PLAYER_RADIUS * 2
-    );
-    ctx.restore();
-  } else {
-    // Fallback: draw green circle if texture not loaded
-    ctx.fillStyle = isLocal ? '#22c55e' : '#16a34a';
-    ctx.beginPath();
-    ctx.arc(screenX, screenY, GAME_CONFIG.PLAYER_RADIUS, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.strokeStyle = '#15803d';
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Eyes
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.arc(screenX - 8, screenY - 5, 4, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#000000';
-    ctx.beginPath();
-    ctx.arc(screenX - 8, screenY - 5, 2, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.arc(screenX + 8, screenY - 5, 4, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#000000';
-    ctx.beginPath();
-    ctx.arc(screenX + 8, screenY - 5, 2, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  // Draw the character
+  drawPlayerCharacter(screenX, screenY, isLocal);
 
   // Character name label
   ctx.fillStyle = '#ffffff';
@@ -462,9 +468,6 @@ export async function initializeGame() {
   }
 
   gameState.selectedCharacter = JSON.parse(selectedChar);
-
-  // Load player texture before starting game
-  await loadPlayerTexture();
 
   resizeCanvas();
   setupKeyboardInput();
