@@ -19,7 +19,15 @@ const MINIMAP_CONFIG = {
   X: 10,
   Y: 10,
   SCALE: 0.004,
-  GRASS_TILE_SIZE: 2 // Minimap tiles
+  GRASS_TILE_SIZE: 2
+};
+
+// Movement smoothing constants
+const MOVEMENT_CONFIG = {
+  MAX_SPEED: 200, // pixels per second
+  ACCELERATION: 0.15, // 0-1, higher = faster acceleration
+  DECELERATION: 0.25, // 0-1, higher = faster deceleration
+  FRICTION: 0.92 // 0-1, applied every frame for smooth gliding
 };
 
 let gameState = {
@@ -29,14 +37,13 @@ let gameState = {
   keys: {},
   ws: null,
   lastInputTime: 0,
-  inputDelay: 50,
+  inputDelay: 33, // ~30fps for input updates to server
   selectedCharacter: null,
   velocity: { x: 0, y: 0 },
   targetVelocity: { x: 0, y: 0 },
-  acceleration: 0.15,
-  maxSpeed: 3,
-  friction: 0.88,
-  groundTexture: null
+  groundTexture: null,
+  lastFrameTime: Date.now(),
+  deltaTime: 0
 };
 
 const canvas = document.getElementById('gameCanvas');
@@ -69,7 +76,6 @@ function loadGroundTexture() {
 // Draw ground using texture
 function drawGrassyGround() {
   if (gameState.groundTexture) {
-    // Use texture pattern
     const pattern = ctx.createPattern(gameState.groundTexture, 'repeat');
     ctx.save();
     ctx.translate(-gameState.camera.x, -gameState.camera.y);
@@ -77,7 +83,6 @@ function drawGrassyGround() {
     ctx.fillRect(gameState.camera.x, gameState.camera.y, GAME_CONFIG.CANVAS_WIDTH, GAME_CONFIG.CANVAS_HEIGHT);
     ctx.restore();
   } else {
-    // Fallback: solid color if texture fails to load
     ctx.fillStyle = '#26a55f';
     ctx.fillRect(0, 0, GAME_CONFIG.CANVAS_WIDTH, GAME_CONFIG.CANVAS_HEIGHT);
   }
@@ -87,7 +92,7 @@ function drawGrassyGround() {
 function drawPlayerCharacter(screenX, screenY, isLocal = false) {
   const radius = GAME_CONFIG.PLAYER_RADIUS;
   
-  // Draw left arm (wider, more body-like)
+  // Draw left arm
   ctx.fillStyle = isLocal ? '#86efac' : '#4ade80';
   ctx.beginPath();
   ctx.ellipse(screenX - radius * 0.75, screenY, radius * 0.5, radius * 0.35, 0, 0, Math.PI * 2);
@@ -97,7 +102,7 @@ function drawPlayerCharacter(screenX, screenY, isLocal = false) {
   ctx.lineWidth = 1.5;
   ctx.stroke();
   
-  // Draw right arm (wider, more body-like)
+  // Draw right arm
   ctx.fillStyle = isLocal ? '#86efac' : '#4ade80';
   ctx.beginPath();
   ctx.ellipse(screenX + radius * 0.75, screenY, radius * 0.5, radius * 0.35, 0, 0, Math.PI * 2);
@@ -107,19 +112,17 @@ function drawPlayerCharacter(screenX, screenY, isLocal = false) {
   ctx.lineWidth = 1.5;
   ctx.stroke();
   
-  // Draw main circle head (top-down view)
+  // Draw main circle head
   ctx.fillStyle = isLocal ? '#22c55e' : '#16a34a';
   ctx.beginPath();
   ctx.arc(screenX, screenY, radius, 0, Math.PI * 2);
   ctx.fill();
   
-  // Draw outline
   ctx.strokeStyle = '#15803d';
   ctx.lineWidth = 2;
   ctx.stroke();
   
-  // Draw wizard hat (pointed cone on top)
-  // Hat brim
+  // Draw wizard hat brim
   ctx.fillStyle = '#6366f1';
   ctx.beginPath();
   ctx.ellipse(screenX, screenY - radius * 0.95, radius * 0.65, radius * 0.2, 0, 0, Math.PI * 2);
@@ -142,13 +145,13 @@ function drawPlayerCharacter(screenX, screenY, isLocal = false) {
   ctx.lineWidth = 1.5;
   ctx.stroke();
   
-  // Hat band (decorative stripe around the brim)
+  // Hat band
   ctx.fillStyle = '#fbbf24';
   ctx.beginPath();
   ctx.ellipse(screenX, screenY - radius * 0.95, radius * 0.65, radius * 0.08, 0, 0, Math.PI * 2);
   ctx.fill();
   
-  // Hat star decoration on the point
+  // Hat star
   const starX = screenX;
   const starY = screenY - radius * 1.4;
   const starSize = radius * 0.15;
@@ -187,16 +190,13 @@ function drawPlayer(player, isLocal = false) {
     return;
   }
 
-  // Draw the character
   drawPlayerCharacter(screenX, screenY, isLocal);
 
-  // Character name label
   ctx.fillStyle = '#ffffff';
   ctx.font = 'bold 12px Arial';
   ctx.textAlign = 'center';
   ctx.fillText(player.characterName || player.username, screenX, screenY - GAME_CONFIG.PLAYER_RADIUS - 25);
 
-  // Local player indicator
   if (isLocal) {
     ctx.strokeStyle = 'rgba(34, 197, 94, 0.5)';
     ctx.lineWidth = 3;
@@ -210,16 +210,13 @@ function drawMinimap() {
   const minimapX = GAME_CONFIG.CANVAS_WIDTH - MINIMAP_CONFIG.WIDTH - 10;
   const minimapY = 10;
 
-  // Draw solid grey background (no texture)
   ctx.fillStyle = '#404040';
   ctx.fillRect(minimapX, minimapY, MINIMAP_CONFIG.WIDTH, MINIMAP_CONFIG.HEIGHT);
 
-  // Border
   ctx.strokeStyle = '#22c55e';
   ctx.lineWidth = 2;
   ctx.strokeRect(minimapX, minimapY, MINIMAP_CONFIG.WIDTH, MINIMAP_CONFIG.HEIGHT);
 
-  // Draw viewport indicator (where player is looking)
   const viewportX = minimapX + (gameState.camera.x / GAME_CONFIG.MAP_WIDTH) * MINIMAP_CONFIG.WIDTH;
   const viewportY = minimapY + (gameState.camera.y / GAME_CONFIG.MAP_HEIGHT) * MINIMAP_CONFIG.HEIGHT;
   const viewportW = (GAME_CONFIG.CANVAS_WIDTH / GAME_CONFIG.MAP_WIDTH) * MINIMAP_CONFIG.WIDTH;
@@ -229,7 +226,6 @@ function drawMinimap() {
   ctx.lineWidth = 1;
   ctx.strokeRect(viewportX, viewportY, viewportW, viewportH);
 
-  // Draw local player
   if (gameState.localPlayer) {
     const localX = minimapX + (gameState.localPlayer.x / GAME_CONFIG.MAP_WIDTH) * MINIMAP_CONFIG.WIDTH;
     const localY = minimapY + (gameState.localPlayer.y / GAME_CONFIG.MAP_HEIGHT) * MINIMAP_CONFIG.HEIGHT;
@@ -240,7 +236,6 @@ function drawMinimap() {
     ctx.fill();
   }
 
-  // Draw other players
   gameState.otherPlayers.forEach((player) => {
     const playerX = minimapX + (player.x / GAME_CONFIG.MAP_WIDTH) * MINIMAP_CONFIG.WIDTH;
     const playerY = minimapY + (player.y / GAME_CONFIG.MAP_HEIGHT) * MINIMAP_CONFIG.HEIGHT;
@@ -262,7 +257,7 @@ function updateCamera() {
   gameState.camera.y = Math.max(0, Math.min(gameState.camera.y, GAME_CONFIG.MAP_HEIGHT - GAME_CONFIG.CANVAS_HEIGHT));
 }
 
-function updateLocalPlayerMovement() {
+function updateLocalPlayerMovement(deltaTime) {
   if (!gameState.localPlayer) return;
 
   // Calculate target velocity based on input
@@ -270,36 +265,43 @@ function updateLocalPlayerMovement() {
   gameState.targetVelocity.y = 0;
 
   if (gameState.keys['w'] || gameState.keys['W']) {
-    gameState.targetVelocity.y -= gameState.maxSpeed;
+    gameState.targetVelocity.y -= MOVEMENT_CONFIG.MAX_SPEED;
   }
   if (gameState.keys['s'] || gameState.keys['S']) {
-    gameState.targetVelocity.y += gameState.maxSpeed;
+    gameState.targetVelocity.y += MOVEMENT_CONFIG.MAX_SPEED;
   }
   if (gameState.keys['a'] || gameState.keys['A']) {
-    gameState.targetVelocity.x -= gameState.maxSpeed;
+    gameState.targetVelocity.x -= MOVEMENT_CONFIG.MAX_SPEED;
   }
   if (gameState.keys['d'] || gameState.keys['D']) {
-    gameState.targetVelocity.x += gameState.maxSpeed;
+    gameState.targetVelocity.x += MOVEMENT_CONFIG.MAX_SPEED;
   }
 
-  // Normalize diagonal movement to prevent speedup
+  // Normalize diagonal movement
   const targetMagnitude = Math.sqrt(gameState.targetVelocity.x ** 2 + gameState.targetVelocity.y ** 2);
-  if (targetMagnitude > gameState.maxSpeed) {
-    gameState.targetVelocity.x = (gameState.targetVelocity.x / targetMagnitude) * gameState.maxSpeed;
-    gameState.targetVelocity.y = (gameState.targetVelocity.y / targetMagnitude) * gameState.maxSpeed;
+  if (targetMagnitude > MOVEMENT_CONFIG.MAX_SPEED) {
+    gameState.targetVelocity.x = (gameState.targetVelocity.x / targetMagnitude) * MOVEMENT_CONFIG.MAX_SPEED;
+    gameState.targetVelocity.y = (gameState.targetVelocity.y / targetMagnitude) * MOVEMENT_CONFIG.MAX_SPEED;
   }
 
-  // Smoothly interpolate velocity toward target
-  gameState.velocity.x += (gameState.targetVelocity.x - gameState.velocity.x) * gameState.acceleration;
-  gameState.velocity.y += (gameState.targetVelocity.y - gameState.velocity.y) * gameState.acceleration;
+  // Smooth acceleration/deceleration
+  const isMoving = gameState.targetVelocity.x !== 0 || gameState.targetVelocity.y !== 0;
+  const accel = isMoving ? MOVEMENT_CONFIG.ACCELERATION : MOVEMENT_CONFIG.DECELERATION;
 
-  // Apply friction to make movement feel smooth
-  gameState.velocity.x *= gameState.friction;
-  gameState.velocity.y *= gameState.friction;
+  gameState.velocity.x += (gameState.targetVelocity.x - gameState.velocity.x) * accel;
+  gameState.velocity.y += (gameState.targetVelocity.y - gameState.velocity.y) * accel;
 
-  // Update position
-  gameState.localPlayer.x += gameState.velocity.x;
-  gameState.localPlayer.y += gameState.velocity.y;
+  // Apply friction for smooth gliding
+  gameState.velocity.x *= MOVEMENT_CONFIG.FRICTION;
+  gameState.velocity.y *= MOVEMENT_CONFIG.FRICTION;
+
+  // Stop if velocity is very small
+  if (Math.abs(gameState.velocity.x) < 0.5) gameState.velocity.x = 0;
+  if (Math.abs(gameState.velocity.y) < 0.5) gameState.velocity.y = 0;
+
+  // Update position based on deltaTime for frame-rate independent movement
+  gameState.localPlayer.x += gameState.velocity.x * (deltaTime / 1000);
+  gameState.localPlayer.y += gameState.velocity.y * (deltaTime / 1000);
 
   // Clamp to map bounds
   gameState.localPlayer.x = Math.max(GAME_CONFIG.PLAYER_RADIUS, Math.min(GAME_CONFIG.MAP_WIDTH - GAME_CONFIG.PLAYER_RADIUS, gameState.localPlayer.x));
@@ -317,7 +319,9 @@ function sendInputToServer() {
     w: gameState.keys['w'] || gameState.keys['W'],
     a: gameState.keys['a'] || gameState.keys['A'],
     s: gameState.keys['s'] || gameState.keys['S'],
-    d: gameState.keys['d'] || gameState.keys['D']
+    d: gameState.keys['d'] || gameState.keys['D'],
+    x: gameState.localPlayer.x,
+    y: gameState.localPlayer.y
   };
 
   gameState.ws.send(JSON.stringify(input));
@@ -325,11 +329,18 @@ function sendInputToServer() {
 }
 
 function gameLoop() {
+  const now = Date.now();
+  gameState.deltaTime = now - gameState.lastFrameTime;
+  gameState.lastFrameTime = now;
+
+  // Cap deltaTime to prevent huge jumps
+  const dt = Math.min(gameState.deltaTime, 50);
+
   ctx.fillStyle = '#1a1a1a';
   ctx.fillRect(0, 0, GAME_CONFIG.CANVAS_WIDTH, GAME_CONFIG.CANVAS_HEIGHT);
 
   drawGrassyGround();
-  updateLocalPlayerMovement();
+  updateLocalPlayerMovement(dt);
   updateCamera();
 
   if (gameState.localPlayer) {
@@ -339,7 +350,6 @@ function gameLoop() {
     drawPlayer(player, false);
   });
 
-  // Draw minimap
   drawMinimap();
 
   requestAnimationFrame(gameLoop);
@@ -464,7 +474,6 @@ export async function initializeGame() {
 
   gameState.selectedCharacter = JSON.parse(selectedChar);
 
-  // Load ground texture before starting game
   await loadGroundTexture();
 
   resizeCanvas();
