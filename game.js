@@ -49,7 +49,7 @@ function resizeCanvas() {
   GAME_CONFIG.CANVAS_HEIGHT = canvas.height;
 }
 
-// Draw a player character (hordes.io/devast.io style with wider arms)
+// Draw a player character (top-down with wizard hat)
 function drawPlayerCharacter(screenX, screenY, isLocal = false) {
   const radius = GAME_CONFIG.PLAYER_RADIUS;
   
@@ -73,7 +73,7 @@ function drawPlayerCharacter(screenX, screenY, isLocal = false) {
   ctx.lineWidth = 1.5;
   ctx.stroke();
   
-  // Draw main circle head
+  // Draw main circle head (top-down view)
   ctx.fillStyle = isLocal ? '#22c55e' : '#16a34a';
   ctx.beginPath();
   ctx.arc(screenX, screenY, radius, 0, Math.PI * 2);
@@ -84,33 +84,63 @@ function drawPlayerCharacter(screenX, screenY, isLocal = false) {
   ctx.lineWidth = 2;
   ctx.stroke();
   
-  // Draw left eye
-  ctx.fillStyle = '#ffffff';
+  // Draw wizard hat (pointed cone on top)
+  // Hat brim
+  ctx.fillStyle = '#6366f1';
   ctx.beginPath();
-  ctx.arc(screenX - radius * 0.35, screenY - radius * 0.25, radius * 0.2, 0, Math.PI * 2);
+  ctx.ellipse(screenX, screenY - radius * 0.95, radius * 0.65, radius * 0.2, 0, 0, Math.PI * 2);
   ctx.fill();
   
-  ctx.fillStyle = '#000000';
+  ctx.strokeStyle = '#4f46e5';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  
+  // Hat point (cone)
+  ctx.fillStyle = '#6366f1';
   ctx.beginPath();
-  ctx.arc(screenX - radius * 0.35, screenY - radius * 0.25, radius * 0.1, 0, Math.PI * 2);
+  ctx.moveTo(screenX - radius * 0.6, screenY - radius * 0.95);
+  ctx.lineTo(screenX + radius * 0.6, screenY - radius * 0.95);
+  ctx.lineTo(screenX, screenY - radius * 1.7);
+  ctx.closePath();
   ctx.fill();
   
-  // Draw right eye
-  ctx.fillStyle = '#ffffff';
+  ctx.strokeStyle = '#4f46e5';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  
+  // Hat band (decorative stripe around the brim)
+  ctx.fillStyle = '#fbbf24';
   ctx.beginPath();
-  ctx.arc(screenX + radius * 0.35, screenY - radius * 0.25, radius * 0.2, 0, Math.PI * 2);
+  ctx.ellipse(screenX, screenY - radius * 0.95, radius * 0.65, radius * 0.08, 0, 0, Math.PI * 2);
   ctx.fill();
   
-  ctx.fillStyle = '#000000';
+  // Hat star decoration on the point
+  const starX = screenX;
+  const starY = screenY - radius * 1.4;
+  const starSize = radius * 0.15;
+  drawStar(starX, starY, 5, starSize, starSize * 0.5, '#fbbf24');
+}
+
+// Helper function to draw a star
+function drawStar(cx, cy, spikes, outerRadius, innerRadius, color) {
+  let rot = Math.PI / 2 * 3;
+  let step = Math.PI / spikes;
+
   ctx.beginPath();
-  ctx.arc(screenX + radius * 0.35, screenY - radius * 0.25, radius * 0.1, 0, Math.PI * 2);
+  ctx.moveTo(cx, cy - outerRadius);
+  for (let i = 0; i < spikes; i++) {
+    ctx.lineTo(cx + Math.cos(rot) * outerRadius, cy + Math.sin(rot) * outerRadius);
+    rot += step;
+
+    ctx.lineTo(cx + Math.cos(rot) * innerRadius, cy + Math.sin(rot) * innerRadius);
+    rot += step;
+  }
+  ctx.lineTo(cx, cy - outerRadius);
+  ctx.closePath();
+  ctx.fillStyle = color;
   ctx.fill();
-  
-  // Draw smile (arc)
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(screenX, screenY + radius * 0.15, radius * 0.25, 0, Math.PI, false);
+  ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+  ctx.lineWidth = 0.5;
   ctx.stroke();
 }
 
@@ -194,7 +224,7 @@ function drawPlayer(player, isLocal = false) {
   ctx.fillStyle = '#ffffff';
   ctx.font = 'bold 12px Arial';
   ctx.textAlign = 'center';
-  ctx.fillText(player.characterName || player.username, screenX, screenY - GAME_CONFIG.PLAYER_RADIUS - 10);
+  ctx.fillText(player.characterName || player.username, screenX, screenY - GAME_CONFIG.PLAYER_RADIUS - 25);
 
   // Local player indicator
   if (isLocal) {
